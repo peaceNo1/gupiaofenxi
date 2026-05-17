@@ -1,0 +1,100 @@
+body {
+  margin: 0;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  background: #f6f7f9;
+  color: #1f2937;
+}
+
+.page {
+  padding: 20px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.status-strip {
+  background: #fff;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  padding: 10px;
+  max-width: 620px;
+}
+
+.status-strip span {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.metrics div,
+.filters,
+.table-wrap {
+  background: #fff;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+}
+
+.metrics div {
+  padding: 12px;
+}
+
+.metrics strong {
+  display: block;
+  font-size: 22px;
+}
+
+.metrics span {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.filters {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.filters input,
+.filters select {
+  margin-left: 6px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1180px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 9px 10px;
+  text-align: left;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+th {
+  background: #eef2f7;
+}

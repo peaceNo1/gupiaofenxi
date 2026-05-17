@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>A 股短线低吸候选仪表盘</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div>
+          <h1>A 股短线低吸候选仪表盘</h1>
+          <p>报告日期 {{ report.report_date }}，生成时间 {{ report.generated_at.strftime("%H:%M:%S") }}</p>
+        </div>
+        <div class="status-strip">
+          数据状态：
+          {% for item in report.data_status %}
+            <span>{{ item.task_name }} {{ item.status.value }} {{ item.ended_at.strftime("%H:%M") }}</span>
+          {% endfor %}
+        </div>
+      </header>
+
+      <section class="metrics">
+        <div><strong>{{ report.market_temperature }}</strong><span>市场温度</span></div>
+        <div><strong>{{ report.strong_pool_count }}</strong><span>强势池数量</span></div>
+        <div><strong>{{ report.high_score_count }}</strong><span>高分候选</span></div>
+        <div><strong>{{ report.risk_count }}</strong><span>风险票</span></div>
+        <div><strong>{{ report.price_range[0] }}-{{ report.price_range[1] }}</strong><span>价格范围</span></div>
+      </section>
+
+      <section class="filters">
+        <label>最低价 <input value="{{ settings.min_price }}"></label>
+        <label>最高价 <input value="{{ settings.max_price }}"></label>
+        <label>标签 <select><option>全部</option><option>强烈关注</option><option>观察</option></select></label>
+        <label>只看强烈关注 <input type="checkbox"></label>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>当前价</th>
+              <th>综合分</th>
+              <th>明日概率</th>
+              <th>3 日概率</th>
+              <th>预期涨幅</th>
+              <th>标签</th>
+              <th>低吸区间</th>
+              <th>止损</th>
+              <th>目标</th>
+              <th>触发条件</th>
+              <th>评分理由</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in report.candidates %}
+              <tr>
+                <td>{{ item.symbol }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ "%.2f"|format(item.current_price) }}</td>
+                <td>{{ "%.2f"|format(item.score) }}</td>
+                <td>{{ "%.1f"|format(item.next_day_up_probability * 100) }}%</td>
+                <td>{{ "%.1f"|format(item.three_day_up_probability * 100) }}%</td>
+                <td>{{ "%.2f"|format(item.expected_return) }}%</td>
+                <td>{{ item.label.value }}</td>
+                <td>{% if item.trade_plan %}{{ item.trade_plan.buy_low }}-{{ item.trade_plan.buy_high }}{% else %}-{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ item.trade_plan.stop_loss }}{% else %}-{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ item.trade_plan.target_price }}{% else %}-{% endif %}</td>
+                <td>{{ item.trade_plan.trigger if item.trade_plan else item.reason }}</td>
+                <td>{{ item.reason }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
