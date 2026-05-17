@@ -24,7 +24,7 @@ def build_dashboard_report(
     )
     high_score_count = sum(1 for item in candidates if item.label == CandidateLabel.STRONG_WATCH)
     risk_count = sum(1 for item in candidates if item.label == CandidateLabel.HIGH_RISK)
-    report_date = max(quote.trade_date for quote in quotes)
+    report_date = max((quote.trade_date for quote in quotes), default=datetime.now().date())
     return DashboardReport(
         report_date=report_date,
         generated_at=datetime.now(),
