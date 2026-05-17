@@ -5,7 +5,7 @@ from gupiaofenxi.domain.models import DataStatusRecord, DataTaskStatus
 
 class DataStatusLog:
     def __init__(self, records: list[DataStatusRecord] | None = None):
-        self.records = records or []
+        self.records = list(records or [])
 
     def record(
         self,
@@ -49,6 +49,11 @@ class DataStatusLog:
             time_text = record.ended_at.strftime("%H:%M")
             if record.status == DataTaskStatus.SUCCESS:
                 parts.append(f"{record.task_name}已更新 {time_text}")
+            elif record.status == DataTaskStatus.PARTIAL:
+                text = f"{record.task_name}部分成功 {time_text}"
+                if record.used_cache:
+                    text += "，使用缓存"
+                parts.append(text)
             elif record.used_cache:
                 parts.append(f"{record.task_name}获取失败 {time_text}，使用缓存")
             else:
