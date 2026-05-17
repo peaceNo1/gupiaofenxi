@@ -29,12 +29,19 @@
         <div><strong>{{ report.price_range[0] }}-{{ report.price_range[1] }}</strong><span>价格范围</span></div>
       </section>
 
-      <section class="filters">
-        <label>最低价 <input value="{{ settings.min_price }}"></label>
-        <label>最高价 <input value="{{ settings.max_price }}"></label>
+      <form class="filters" method="get" action="/">
+        <label>
+          最低价
+          <input type="number" step="0.01" min="0" name="min_price" value="{{ settings.min_price }}">
+        </label>
+        <label>
+          最高价
+          <input type="number" step="0.01" min="0" name="max_price" value="{{ settings.max_price }}">
+        </label>
         <label>标签 <select><option>全部</option><option>强烈关注</option><option>观察</option></select></label>
         <label>只看强烈关注 <input type="checkbox"></label>
-      </section>
+        <button type="submit">应用</button>
+      </form>
 
       <section class="table-wrap">
         <table>
