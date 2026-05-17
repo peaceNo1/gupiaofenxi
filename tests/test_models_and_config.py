@@ -14,6 +14,11 @@ def test_default_price_range_matches_personal_constraints():
     assert settings.max_price == 60
 
 
+def test_app_settings_rejects_zero_min_amount():
+    with pytest.raises(ValidationError):
+        AppSettings(min_amount=0)
+
+
 def test_stock_quote_computes_amplitude():
     quote = StockQuote(
         symbol="000001",
