@@ -9,6 +9,19 @@ from gupiaofenxi.storage.json_store import JsonStore
 from gupiaofenxi.web.app import create_app
 
 
+class FakeRefresher:
+    def __init__(self, count=1, error=None):
+        self.count = count
+        self.error = error
+        self.called = False
+
+    def refresh(self):
+        self.called = True
+        if self.error:
+            raise self.error
+        return self.count
+
+
 def sample_provider_factory():
     return SampleDataProvider(Path("data/sample"))
 
@@ -77,3 +90,32 @@ def test_dashboard_can_use_exported_csv_provider(tmp_path):
     assert response.status_code == 200
     assert "000001" in response.text
     assert "10.99" in response.text
+
+
+def test_refresh_button_calls_eastmoney_refresher(tmp_path):
+    refresher = FakeRefresher(count=123)
+    client = TestClient(
+        create_app(
+            store_root=tmp_path,
+            provider_factory=sample_provider_factory,
+            refresher=refresher,
+        )
+    )
+
+    response = client.post("/refresh?min_price=20&max_price=30", follow_redirects=False)
+
+    assert refresher.called is True
+    assert response.status_code == 303
+    assert "refresh_status=" in response.headers["location"]
+    assert "min_price=20" in response.headers["location"]
+
+
+def test_refresh_button_is_rendered(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "刷新东方财富数据" in response.text
+    assert 'method="post"' in response.text
+    assert "/refresh" in response.text

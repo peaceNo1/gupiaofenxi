@@ -1,14 +1,14 @@
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from gupiaofenxi.config import AppSettings
-from gupiaofenxi.data.akshare_provider import AkshareDataProvider
 from gupiaofenxi.data.csv_provider import CsvDataProvider
-from gupiaofenxi.data.hybrid_provider import HybridDataProvider
+from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefresher
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport
 from gupiaofenxi.pipeline.report import build_dashboard_report
@@ -24,6 +24,7 @@ def create_app(
     sample_dir: Path | None = None,
     store_root: Path | None = None,
     provider_factory=None,
+    refresher=None,
 ) -> FastAPI:
     app = FastAPI(title="A 股短线低吸候选仪表盘")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -31,20 +32,12 @@ def create_app(
     sample_data_dir = sample_dir or PROJECT_DIR / "data" / "sample"
     import_csv_path = PROJECT_DIR / "data" / "import" / "daily_quotes.csv"
     store = JsonStore(store_root or PROJECT_DIR / "data" / "local")
+    refresher = refresher or EastmoneyRefresher(import_csv_path)
     provider_factory = provider_factory or (
         lambda: (
-            HybridDataProvider(
-                primary=CsvDataProvider(import_csv_path),
-                fallback=HybridDataProvider(
-                    primary=AkshareDataProvider(),
-                    fallback=SampleDataProvider(sample_data_dir),
-                ),
-            )
+            CsvDataProvider(import_csv_path)
             if import_csv_path.exists()
-            else HybridDataProvider(
-                primary=AkshareDataProvider(),
-                fallback=SampleDataProvider(sample_data_dir),
-            )
+            else SampleDataProvider(sample_data_dir)
         )
     )
 
@@ -69,6 +62,8 @@ def create_app(
         request: Request,
         min_price: float = DEFAULT_SETTINGS.min_price,
         max_price: float = DEFAULT_SETTINGS.max_price,
+        refresh_status: str | None = None,
+        refresh_error: str | None = None,
     ):
         report, settings = generate_report(min_price, max_price)
         return templates.TemplateResponse(
@@ -77,8 +72,23 @@ def create_app(
             {
                 "report": report,
                 "settings": settings,
+                "refresh_status": refresh_status,
+                "refresh_error": refresh_error,
             },
         )
+
+    @app.post("/refresh")
+    def refresh_data(
+        min_price: float = DEFAULT_SETTINGS.min_price,
+        max_price: float = DEFAULT_SETTINGS.max_price,
+    ):
+        params = {"min_price": min_price, "max_price": max_price}
+        try:
+            count = refresher.refresh()
+            params["refresh_status"] = f"已从东方财富刷新 {count} 条行情"
+        except Exception as exc:
+            params["refresh_error"] = f"东方财富刷新失败：{exc}"
+        return RedirectResponse(url="/?" + urlencode(params), status_code=303)
 
     @app.get("/api/report")
     def api_report(

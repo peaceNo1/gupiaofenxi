@@ -68,12 +68,44 @@ h1 {
   gap: 14px;
   align-items: center;
   padding: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .filters input,
 .filters select {
   margin-left: 6px;
+}
+
+.refresh-form {
+  margin-bottom: 14px;
+}
+
+.filters button,
+.refresh-form button {
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  padding: 7px 12px;
+}
+
+.refresh-message {
+  border-radius: 6px;
+  margin: 12px 0;
+  padding: 10px 12px;
+}
+
+.refresh-message.success {
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.refresh-message.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
 }
 
 .table-wrap {

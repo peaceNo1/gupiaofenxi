@@ -20,6 +20,12 @@
           {% endfor %}
         </div>
       </header>
+      {% if refresh_status %}
+        <div class="refresh-message success">{{ refresh_status }}</div>
+      {% endif %}
+      {% if refresh_error %}
+        <div class="refresh-message error">{{ refresh_error }}</div>
+      {% endif %}
 
       <section class="metrics">
         <div><strong>{{ report.market_temperature }}</strong><span>市场温度</span></div>
@@ -41,6 +47,9 @@
         <label>标签 <select><option>全部</option><option>强烈关注</option><option>观察</option></select></label>
         <label>只看强烈关注 <input type="checkbox"></label>
         <button type="submit">应用</button>
+      </form>
+      <form class="refresh-form" method="post" action="/refresh?min_price={{ settings.min_price }}&max_price={{ settings.max_price }}">
+        <button type="submit">刷新东方财富数据</button>
       </form>
 
       <section class="table-wrap">
