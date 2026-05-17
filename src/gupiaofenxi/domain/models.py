@@ -23,7 +23,7 @@ class StockQuote(BaseModel):
     symbol: str
     name: str
     trade_date: date
-    open: float
+    open: float = Field(gt=0)
     high: float
     low: float
     close: float
