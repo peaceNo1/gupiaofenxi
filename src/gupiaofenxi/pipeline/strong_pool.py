@@ -19,6 +19,6 @@ def build_strong_pool(
             continue
         filtered.append(quote)
 
-    return sorted(filtered, key=lambda quote: (quote.amount, quote.pct_change), reverse=True)[
+    return sorted(filtered, key=lambda quote: (-quote.amount, -quote.pct_change, quote.symbol))[
         : settings.top_pool_size
     ]
