@@ -6,6 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from gupiaofenxi.config import AppSettings
+from gupiaofenxi.data.akshare_provider import AkshareDataProvider
+from gupiaofenxi.data.hybrid_provider import HybridDataProvider
+from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport
 from gupiaofenxi.pipeline.report import build_dashboard_report
 from gupiaofenxi.storage.json_store import JsonStore
@@ -16,12 +19,22 @@ PROJECT_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_SETTINGS = AppSettings()
 
 
-def create_app(sample_dir: Path | None = None, store_root: Path | None = None) -> FastAPI:
+def create_app(
+    sample_dir: Path | None = None,
+    store_root: Path | None = None,
+    provider_factory=None,
+) -> FastAPI:
     app = FastAPI(title="A 股短线低吸候选仪表盘")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
     templates = Jinja2Templates(directory=BASE_DIR / "templates")
     sample_data_dir = sample_dir or PROJECT_DIR / "data" / "sample"
     store = JsonStore(store_root or PROJECT_DIR / "data" / "local")
+    provider_factory = provider_factory or (
+        lambda: HybridDataProvider(
+            primary=AkshareDataProvider(),
+            fallback=SampleDataProvider(sample_data_dir),
+        )
+    )
 
     def generate_report(min_price: float, max_price: float) -> tuple[DashboardReport, AppSettings]:
         settings = AppSettings(min_price=min_price, max_price=max_price)
@@ -34,6 +47,7 @@ def create_app(sample_dir: Path | None = None, store_root: Path | None = None) -
             sample_dir=sample_data_dir,
             settings=settings,
             manual_exclusions=manual_exclusions,
+            provider=provider_factory(),
         )
         store.save_report(report)
         return report, settings

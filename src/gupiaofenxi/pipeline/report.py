@@ -12,8 +12,9 @@ def build_dashboard_report(
     sample_dir: Path,
     settings: AppSettings,
     manual_exclusions: set[str],
+    provider=None,
 ) -> DashboardReport:
-    provider = SampleDataProvider(sample_dir)
+    provider = provider or SampleDataProvider(sample_dir)
     quotes, quote_status = provider.load_daily_quotes()
     market_temperature, index_status = provider.load_market_temperature()
     pool = build_strong_pool(quotes, settings, manual_exclusions)

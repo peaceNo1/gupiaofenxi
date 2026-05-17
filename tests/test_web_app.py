@@ -1,12 +1,19 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
+from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import ManualOverride
 from gupiaofenxi.storage.json_store import JsonStore
 from gupiaofenxi.web.app import create_app
 
 
+def sample_provider_factory():
+    return SampleDataProvider(Path("data/sample"))
+
+
 def test_dashboard_page_renders_ranking_first_view(tmp_path):
-    client = TestClient(create_app(store_root=tmp_path))
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
     response = client.get("/")
 
@@ -17,7 +24,7 @@ def test_dashboard_page_renders_ranking_first_view(tmp_path):
 
 
 def test_api_report_respects_price_query_range_and_saves_report(tmp_path):
-    client = TestClient(create_app(store_root=tmp_path))
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
     response = client.get("/api/report?min_price=20&max_price=30")
 
@@ -35,7 +42,7 @@ def test_dashboard_respects_price_query_and_manual_exclusions(tmp_path):
     JsonStore(tmp_path).save_manual_overrides(
         [ManualOverride(symbol="002001", excluded=True, note="manual skip")]
     )
-    client = TestClient(create_app(store_root=tmp_path))
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
     response = client.get("/?min_price=20&max_price=30")
 
