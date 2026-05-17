@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from gupiaofenxi.data.csv_provider import CsvDataProvider
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import ManualOverride
 from gupiaofenxi.storage.json_store import JsonStore
@@ -55,3 +56,24 @@ def test_dashboard_respects_price_query_and_manual_exclusions(tmp_path):
     assert "002001" not in response.text
     assert "000001" not in response.text
     assert "300001" not in response.text
+
+
+def test_dashboard_can_use_exported_csv_provider(tmp_path):
+    csv_path = tmp_path / "daily_quotes.csv"
+    csv_path.write_text(
+        "代码,名称,最新价,今开,最高,最低,成交量,成交额,涨跌幅\n"
+        "000001,平安银行,10.99,11.05,11.14,10.96,974700,107000000,-0.54\n",
+        encoding="utf-8-sig",
+    )
+    client = TestClient(
+        create_app(
+            store_root=tmp_path / "store",
+            provider_factory=lambda: CsvDataProvider(csv_path),
+        )
+    )
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "000001" in response.text
+    assert "10.99" in response.text

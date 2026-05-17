@@ -37,6 +37,29 @@ python -m uvicorn gupiaofenxi.web.app:app --reload --app-dir src
 http://127.0.0.1:8000
 ```
 
+## 使用导出的行情 CSV
+
+如果你想让仪表盘和通达信、同花顺、东方财富里的价格对齐，可以把导出的行情文件保存为：
+
+```text
+data/import/daily_quotes.csv
+```
+
+CSV 支持这些常见列名：
+
+- 代码 / 证券代码 / symbol / code
+- 名称 / 证券名称 / name
+- 最新价 / 现价 / 当前价 / 收盘价 / close
+- 今开 / 开盘价 / open
+- 最高 / 最高价 / high
+- 最低 / 最低价 / low
+- 成交量 / volume
+- 成交额 / amount
+- 涨跌幅 / pct_change
+- 行业、概念
+
+只要 `data/import/daily_quotes.csv` 存在，仪表盘会优先使用这个文件；没有导入文件时，再尝试 AkShare；AkShare 失败时才回退到 `data/sample`。
+
 ## 说明
 
 当前版本默认优先使用 AkShare 的东方财富 A 股实时行情接口。如果 AkShare 未安装、网络失败或源站返回异常，页面会回退到 `data/sample` 下的样例行情数据，并在数据状态里显示失败和回退记录。

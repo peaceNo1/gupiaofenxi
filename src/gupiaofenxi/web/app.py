@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.data.akshare_provider import AkshareDataProvider
+from gupiaofenxi.data.csv_provider import CsvDataProvider
 from gupiaofenxi.data.hybrid_provider import HybridDataProvider
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport
@@ -28,11 +29,22 @@ def create_app(
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
     templates = Jinja2Templates(directory=BASE_DIR / "templates")
     sample_data_dir = sample_dir or PROJECT_DIR / "data" / "sample"
+    import_csv_path = PROJECT_DIR / "data" / "import" / "daily_quotes.csv"
     store = JsonStore(store_root or PROJECT_DIR / "data" / "local")
     provider_factory = provider_factory or (
-        lambda: HybridDataProvider(
-            primary=AkshareDataProvider(),
-            fallback=SampleDataProvider(sample_data_dir),
+        lambda: (
+            HybridDataProvider(
+                primary=CsvDataProvider(import_csv_path),
+                fallback=HybridDataProvider(
+                    primary=AkshareDataProvider(),
+                    fallback=SampleDataProvider(sample_data_dir),
+                ),
+            )
+            if import_csv_path.exists()
+            else HybridDataProvider(
+                primary=AkshareDataProvider(),
+                fallback=SampleDataProvider(sample_data_dir),
+            )
         )
     )
 
