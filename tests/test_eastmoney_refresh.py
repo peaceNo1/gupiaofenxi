@@ -2,7 +2,7 @@ import csv
 
 import requests
 
-from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefresher
+from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefreshError, EastmoneyRefresher
 
 
 class FakeResponse:
@@ -105,10 +105,42 @@ class PagedResponse:
 
     def json(self):
         if self.page == 1:
-            row = {"f12": "000001", "f14": "平安银行", "f2": 10.99}
+            row = {"f12": "000001", "f14": "平安银行", "f2": 10.99, "f6": 107000000}
         else:
-            row = {"f12": "000002", "f14": "万科A", "f2": 8.40}
+            row = {"f12": "000002", "f14": "万科A", "f2": 8.40, "f6": 120000000}
         return {"data": {"total": 2, "diff": [row]}}
+
+
+class PlaceholderSession:
+    trust_env = True
+
+    def get(self, *args, **kwargs):
+        return PlaceholderResponse()
+
+
+class PlaceholderResponse:
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "data": {
+                "total": 1,
+                "diff": [
+                    {
+                        "f12": "000001",
+                        "f14": "平安银行",
+                        "f2": "-",
+                        "f17": "-",
+                        "f15": "-",
+                        "f16": "-",
+                        "f5": "-",
+                        "f6": "-",
+                        "f3": "-",
+                    }
+                ],
+            }
+        }
 
 
 def test_eastmoney_refresher_writes_import_csv(monkeypatch, tmp_path):
@@ -179,3 +211,24 @@ def test_eastmoney_refresher_fetches_all_pages(monkeypatch, tmp_path):
 
     assert count == 2
     assert fake_session.pages == [1, 2]
+
+
+def test_eastmoney_refresher_does_not_overwrite_when_rows_are_placeholders(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "gupiaofenxi.data.eastmoney_refresh.requests.Session",
+        lambda: PlaceholderSession(),
+    )
+    csv_path = tmp_path / "daily_quotes.csv"
+    original = "代码,名称,最新价,今开,最高,最低,成交量,成交额,涨跌幅,刷新时间\n000001,平安银行,10.99,11.05,11.14,10.96,974700,107000000,-0.54,2026-05-15 15:00:00\n"
+    csv_path.write_text(original, encoding="utf-8-sig")
+
+    try:
+        EastmoneyRefresher(csv_path).refresh()
+    except EastmoneyRefreshError as exc:
+        assert "未返回可用行情" in str(exc)
+    else:
+        raise AssertionError("placeholder rows should not be accepted")
+
+    assert csv_path.read_text(encoding="utf-8-sig") == original

@@ -52,6 +52,8 @@ class EastmoneyRefresher:
         rows = self._fetch_rows()
         if not rows:
             raise EastmoneyRefreshError("东方财富返回空行情")
+        if self._usable_row_count(rows) == 0:
+            raise EastmoneyRefreshError("东方财富当前未返回可用行情，已保留原有数据")
         self._write_csv(rows)
         return len(rows)
 
@@ -191,6 +193,19 @@ class EastmoneyRefresher:
             return round(float(value) / 100, 4)
         except (TypeError, ValueError):
             return value
+
+    @staticmethod
+    def _usable_row_count(rows: list[dict[str, Any]]) -> int:
+        usable = 0
+        for row in rows:
+            try:
+                price = float(row.get("f2"))
+                amount = float(row.get("f6"))
+            except (TypeError, ValueError):
+                continue
+            if price > 0 and amount > 0:
+                usable += 1
+        return usable
 
     def _write_csv(self, rows: list[dict[str, Any]]) -> None:
         self.csv_path.parent.mkdir(parents=True, exist_ok=True)

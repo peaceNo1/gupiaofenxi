@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.data.csv_provider import CsvDataProvider
 from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefreshError, EastmoneyRefresher
+from gupiaofenxi.data.fallback_provider import FallbackDataProvider
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport
 from gupiaofenxi.pipeline.report import build_dashboard_report
@@ -37,7 +38,10 @@ def create_app(
     )
     provider_factory = provider_factory or (
         lambda: (
-            CsvDataProvider(import_csv_path)
+            FallbackDataProvider(
+                primary=CsvDataProvider(import_csv_path),
+                fallback=SampleDataProvider(sample_data_dir),
+            )
             if import_csv_path.exists()
             else SampleDataProvider(sample_data_dir)
         )
