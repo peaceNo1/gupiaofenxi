@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.data.csv_provider import CsvDataProvider
-from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefresher
+from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefreshError, EastmoneyRefresher
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport
 from gupiaofenxi.pipeline.report import build_dashboard_report
@@ -32,7 +32,9 @@ def create_app(
     sample_data_dir = sample_dir or PROJECT_DIR / "data" / "sample"
     import_csv_path = PROJECT_DIR / "data" / "import" / "daily_quotes.csv"
     store = JsonStore(store_root or PROJECT_DIR / "data" / "local")
-    refresher = refresher or EastmoneyRefresher(import_csv_path)
+    refresher = refresher or EastmoneyRefresher(
+        import_csv_path, symbols_csv_path=sample_data_dir / "daily_quotes.csv"
+    )
     provider_factory = provider_factory or (
         lambda: (
             CsvDataProvider(import_csv_path)
@@ -82,8 +84,10 @@ def create_app(
         try:
             count = refresher.refresh()
             params["refresh_status"] = f"已从东方财富刷新 {count} 条行情"
-        except Exception as exc:
-            params["refresh_error"] = f"东方财富刷新失败：{exc}"
+        except EastmoneyRefreshError as exc:
+            params["refresh_error"] = str(exc)
+        except Exception:
+            params["refresh_error"] = "东方财富刷新失败：网络连接异常，请稍后重试；当前继续使用已有数据"
         return RedirectResponse(url="/?" + urlencode(params), status_code=303)
 
     @app.get("/refresh")

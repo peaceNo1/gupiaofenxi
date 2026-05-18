@@ -127,6 +127,25 @@ def test_refresh_url_also_works_with_get(tmp_path):
     assert "refresh_status=" in response.headers["location"]
 
 
+def test_refresh_failure_uses_friendly_message_without_raw_network_error(tmp_path):
+    refresher = FakeRefresher(error=ConnectionError("RemoteDisconnected raw detail"))
+    client = TestClient(
+        create_app(
+            store_root=tmp_path,
+            provider_factory=sample_provider_factory,
+            refresher=refresher,
+        )
+    )
+
+    response = client.get("/refresh?min_price=3&max_price=60", follow_redirects=False)
+
+    assert refresher.called is True
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert "refresh_error=" in location
+    assert "RemoteDisconnected" not in location
+
+
 def test_refresh_button_is_rendered(tmp_path):
     client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
