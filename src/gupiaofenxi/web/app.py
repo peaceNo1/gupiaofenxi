@@ -77,11 +77,7 @@ def create_app(
             },
         )
 
-    @app.post("/refresh")
-    def refresh_data(
-        min_price: float = DEFAULT_SETTINGS.min_price,
-        max_price: float = DEFAULT_SETTINGS.max_price,
-    ):
+    def refresh_response(min_price: float, max_price: float) -> RedirectResponse:
         params = {"min_price": min_price, "max_price": max_price}
         try:
             count = refresher.refresh()
@@ -89,6 +85,20 @@ def create_app(
         except Exception as exc:
             params["refresh_error"] = f"东方财富刷新失败：{exc}"
         return RedirectResponse(url="/?" + urlencode(params), status_code=303)
+
+    @app.get("/refresh")
+    def refresh_data_get(
+        min_price: float = DEFAULT_SETTINGS.min_price,
+        max_price: float = DEFAULT_SETTINGS.max_price,
+    ):
+        return refresh_response(min_price, max_price)
+
+    @app.post("/refresh")
+    def refresh_data_post(
+        min_price: float = DEFAULT_SETTINGS.min_price,
+        max_price: float = DEFAULT_SETTINGS.max_price,
+    ):
+        return refresh_response(min_price, max_price)
 
     @app.get("/api/report")
     def api_report(

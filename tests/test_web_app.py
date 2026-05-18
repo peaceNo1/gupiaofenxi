@@ -110,6 +110,23 @@ def test_refresh_button_calls_eastmoney_refresher(tmp_path):
     assert "min_price=20" in response.headers["location"]
 
 
+def test_refresh_url_also_works_with_get(tmp_path):
+    refresher = FakeRefresher(count=456)
+    client = TestClient(
+        create_app(
+            store_root=tmp_path,
+            provider_factory=sample_provider_factory,
+            refresher=refresher,
+        )
+    )
+
+    response = client.get("/refresh?min_price=3&max_price=60", follow_redirects=False)
+
+    assert refresher.called is True
+    assert response.status_code == 303
+    assert "refresh_status=" in response.headers["location"]
+
+
 def test_refresh_button_is_rendered(tmp_path):
     client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
