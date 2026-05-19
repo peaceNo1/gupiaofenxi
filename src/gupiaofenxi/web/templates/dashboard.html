@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <main class="page">
+    <main class="page" data-watch-refresh="30" data-min-price="{{ settings.min_price }}" data-max-price="{{ settings.max_price }}">
       <header class="topbar">
         <div>
           <h1>A 股短线低吸候选仪表盘</h1>
@@ -26,6 +26,17 @@
       {% if refresh_error %}
         <div class="refresh-message error">{{ refresh_error }}</div>
       {% endif %}
+
+      <section class="watch-panel">
+        <div>
+          <strong>实时盯盘</strong>
+          <span>上次刷新 {{ report.generated_at.strftime("%H:%M:%S") }}</span>
+        </div>
+        <div class="watch-status">
+          <span class="pulse"></span>
+          <span id="watch-countdown">30</span> 秒后自动刷新东方财富数据
+        </div>
+      </section>
 
       <section class="metrics">
         <div><strong>{{ report.market_temperature }}</strong><span>市场温度</span></div>
@@ -59,6 +70,7 @@
               <th>代码</th>
               <th>名称</th>
               <th>当前价</th>
+              <th>当日涨幅</th>
               <th>综合分</th>
               <th>明日概率</th>
               <th>3 日概率</th>
@@ -77,6 +89,7 @@
                 <td>{{ item.symbol }}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ "%.2f"|format(item.current_price) }}</td>
+                <td class="{{ 'rise' if item.daily_pct_change >= 0 else 'fall' }}">{{ "%.2f"|format(item.daily_pct_change) }}%</td>
                 <td>{{ "%.2f"|format(item.score) }}</td>
                 <td>{{ "%.1f"|format(item.next_day_up_probability * 100) }}%</td>
                 <td>{{ "%.1f"|format(item.three_day_up_probability * 100) }}%</td>
@@ -93,5 +106,22 @@
         </table>
       </section>
     </main>
+    <script>
+      const page = document.querySelector("[data-watch-refresh]");
+      const countdown = document.getElementById("watch-countdown");
+      if (page && countdown) {
+        let seconds = Number(page.dataset.watchRefresh || 30);
+        const refreshUrl = new URL("/refresh", window.location.origin);
+        refreshUrl.searchParams.set("min_price", page.dataset.minPrice || "3");
+        refreshUrl.searchParams.set("max_price", page.dataset.maxPrice || "60");
+        window.setInterval(() => {
+          seconds -= 1;
+          countdown.textContent = String(seconds);
+          if (seconds <= 0) {
+            window.location.href = refreshUrl.toString();
+          }
+        }, 1000);
+      }
+    </script>
   </body>
 </html>

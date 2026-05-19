@@ -73,6 +73,7 @@ class CandidateScore(BaseModel):
     symbol: str
     name: str
     current_price: float
+    daily_pct_change: float
     score: float = Field(ge=0, le=100)
     next_day_up_probability: float = Field(ge=0, le=1)
     three_day_up_probability: float = Field(ge=0, le=1)

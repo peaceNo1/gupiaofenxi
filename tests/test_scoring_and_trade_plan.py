@@ -28,6 +28,7 @@ def test_score_candidate_returns_full_prediction_fields():
     candidate = score_candidate(make_quote(), AppSettings())
 
     assert candidate.symbol == "002001"
+    assert candidate.daily_pct_change == 2.1
     assert 0 <= candidate.score <= 100
     assert 0 <= candidate.next_day_up_probability <= 1
     assert 0 <= candidate.three_day_up_probability <= 1

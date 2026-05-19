@@ -155,3 +155,15 @@ def test_refresh_button_is_rendered(tmp_path):
     assert "刷新东方财富数据" in response.text
     assert 'method="post"' in response.text
     assert "/refresh" in response.text
+
+
+def test_dashboard_renders_watch_mode_and_daily_change_column(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.get("/?min_price=3&max_price=13")
+
+    assert response.status_code == 200
+    assert "实时盯盘" in response.text
+    assert "当日涨幅" in response.text
+    assert 'data-watch-refresh="30"' in response.text
+    assert "/refresh?min_price={{" not in response.text
