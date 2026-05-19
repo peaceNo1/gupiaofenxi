@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <main class="page" data-watch-refresh="30" data-min-price="{{ settings.min_price }}" data-max-price="{{ settings.max_price }}">
+    <main class="page" data-watch-refresh="60" data-min-price="{{ settings.min_price }}" data-max-price="{{ settings.max_price }}">
       <header class="topbar">
         <div>
           <h1>A 股短线低吸候选仪表盘</h1>
@@ -34,7 +34,7 @@
         </div>
         <div class="watch-status">
           <span class="pulse"></span>
-          <span id="watch-countdown">30</span> 秒后自动刷新东方财富数据
+          <span id="watch-countdown">60</span> 秒后自动刷新东方财富数据
         </div>
       </section>
 
@@ -110,14 +110,21 @@
       const page = document.querySelector("[data-watch-refresh]");
       const countdown = document.getElementById("watch-countdown");
       if (page && countdown) {
-        let seconds = Number(page.dataset.watchRefresh || 30);
+        let seconds = Number(page.dataset.watchRefresh || 60);
+        let refreshing = false;
         const refreshUrl = new URL("/refresh", window.location.origin);
         refreshUrl.searchParams.set("min_price", page.dataset.minPrice || "3");
         refreshUrl.searchParams.set("max_price", page.dataset.maxPrice || "60");
-        window.setInterval(() => {
+        const timer = window.setInterval(() => {
+          if (refreshing) {
+            return;
+          }
           seconds -= 1;
-          countdown.textContent = String(seconds);
+          countdown.textContent = String(Math.max(seconds, 0));
           if (seconds <= 0) {
+            refreshing = true;
+            window.clearInterval(timer);
+            countdown.textContent = "正在刷新";
             window.location.href = refreshUrl.toString();
           }
         }, 1000);

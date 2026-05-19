@@ -165,5 +165,8 @@ def test_dashboard_renders_watch_mode_and_daily_change_column(tmp_path):
     assert response.status_code == 200
     assert "实时盯盘" in response.text
     assert "当日涨幅" in response.text
-    assert 'data-watch-refresh="30"' in response.text
+    assert 'data-watch-refresh="60"' in response.text
+    assert "let refreshing = false;" in response.text
+    assert "window.clearInterval(timer);" in response.text
+    assert "正在刷新" in response.text
     assert "/refresh?min_price={{" not in response.text
