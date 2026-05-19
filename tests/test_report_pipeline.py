@@ -18,6 +18,32 @@ def test_build_dashboard_report_contains_status_and_ranked_candidates():
     assert all(candidate.current_price <= 60 for candidate in report.candidates)
 
 
+def test_build_dashboard_report_filters_by_symbol_and_name_and_marks_favorites():
+    report = build_dashboard_report(
+        sample_dir=Path("data/sample"),
+        settings=AppSettings(min_price=3, max_price=60),
+        manual_exclusions=set(),
+        favorite_symbols={"000001"},
+        symbol_query="000",
+        name_query="银行",
+    )
+
+    assert [item.symbol for item in report.candidates] == ["000001"]
+    assert report.candidates[0].is_favorite is True
+    assert [item.symbol for item in report.favorite_candidates] == ["000001"]
+
+
+def test_build_dashboard_report_searches_before_top_pool_truncation():
+    report = build_dashboard_report(
+        sample_dir=Path("data/sample"),
+        settings=AppSettings(min_price=3, max_price=60, top_pool_size=1),
+        manual_exclusions=set(),
+        symbol_query="000001",
+    )
+
+    assert [item.symbol for item in report.candidates] == ["000001"]
+
+
 def test_build_dashboard_report_handles_empty_daily_quotes(tmp_path):
     sample_dir = tmp_path / "sample"
     sample_dir.mkdir()

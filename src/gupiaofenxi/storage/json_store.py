@@ -26,6 +26,20 @@ class JsonStore:
         payload = json.loads(self.manual_overrides_path.read_text(encoding="utf-8"))
         return {item["symbol"]: ManualOverride(**item) for item in payload}
 
+    def set_focus(self, symbol: str, focus: bool) -> None:
+        symbol = symbol.zfill(6)
+        overrides = self.load_manual_overrides()
+        current = overrides.get(symbol, ManualOverride(symbol=symbol))
+        overrides[symbol] = current.model_copy(update={"focus": focus})
+        self.save_manual_overrides(list(overrides.values()))
+
+    def focused_symbols(self) -> set[str]:
+        return {
+            symbol
+            for symbol, override in self.load_manual_overrides().items()
+            if override.focus
+        }
+
     def save_report(self, report: DashboardReport) -> Path:
         path = self.root / f"report-{report.report_date.isoformat()}.json"
         path.write_text(report.model_dump_json(indent=2), encoding="utf-8")

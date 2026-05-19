@@ -17,3 +17,13 @@ def test_json_store_persists_manual_overrides(tmp_path: Path):
 
     assert loaded["002001"].excluded is True
     assert loaded["300001"].focus is True
+
+
+def test_json_store_can_toggle_focus_symbol(tmp_path: Path):
+    store = JsonStore(tmp_path)
+
+    store.set_focus("000001", True)
+    assert store.load_manual_overrides()["000001"].focus is True
+
+    store.set_focus("000001", False)
+    assert store.load_manual_overrides()["000001"].focus is False

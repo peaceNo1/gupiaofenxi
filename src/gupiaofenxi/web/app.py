@@ -52,16 +52,25 @@ def create_app(
     )
 
     def generate_report(min_price: float, max_price: float) -> tuple[DashboardReport, AppSettings]:
+        return generate_report_with_filters(min_price, max_price, "", "")
+
+    def generate_report_with_filters(
+        min_price: float,
+        max_price: float,
+        symbol_query: str = "",
+        name_query: str = "",
+    ) -> tuple[DashboardReport, AppSettings]:
         settings = AppSettings(min_price=min_price, max_price=max_price)
-        manual_exclusions = {
-            symbol
-            for symbol, override in store.load_manual_overrides().items()
-            if override.excluded
-        }
+        overrides = store.load_manual_overrides()
+        manual_exclusions = {symbol for symbol, override in overrides.items() if override.excluded}
+        favorite_symbols = {symbol for symbol, override in overrides.items() if override.focus}
         report = build_dashboard_report(
             sample_dir=sample_data_dir,
             settings=settings,
             manual_exclusions=manual_exclusions,
+            favorite_symbols=favorite_symbols,
+            symbol_query=symbol_query,
+            name_query=name_query,
             provider=provider_factory(),
         )
         store.save_report(report)
@@ -102,8 +111,12 @@ def create_app(
         max_price: float = DEFAULT_SETTINGS.max_price,
         refresh_status: str | None = None,
         refresh_error: str | None = None,
+        symbol_query: str = "",
+        name_query: str = "",
     ):
-        report, settings = generate_report(min_price, max_price)
+        report, settings = generate_report_with_filters(
+            min_price, max_price, symbol_query, name_query
+        )
         return templates.TemplateResponse(
             request,
             "dashboard.html",
@@ -112,6 +125,8 @@ def create_app(
                 "settings": settings,
                 "refresh_status": refresh_status,
                 "refresh_error": refresh_error,
+                "symbol_query": symbol_query,
+                "name_query": name_query,
             },
         )
 
@@ -152,17 +167,21 @@ def create_app(
     def api_watch_report(
         min_price: float = DEFAULT_SETTINGS.min_price,
         max_price: float = DEFAULT_SETTINGS.max_price,
+        symbol_query: str = "",
+        name_query: str = "",
     ):
-        report, _ = generate_report(min_price, max_price)
+        report, _ = generate_report_with_filters(min_price, max_price, symbol_query, name_query)
         return report
 
     @app.post("/api/watch/refresh")
     async def api_watch_refresh(
         min_price: float = DEFAULT_SETTINGS.min_price,
         max_price: float = DEFAULT_SETTINGS.max_price,
+        symbol_query: str = "",
+        name_query: str = "",
     ):
         status, count = await refresh_market_data()
-        report, _ = generate_report(min_price, max_price)
+        report, _ = generate_report_with_filters(min_price, max_price, symbol_query, name_query)
         return JSONResponse(
             {
                 "status": status,
@@ -176,15 +195,29 @@ def create_app(
         request: Request,
         min_price: float = DEFAULT_SETTINGS.min_price,
         max_price: float = DEFAULT_SETTINGS.max_price,
+        symbol_query: str = "",
+        name_query: str = "",
     ):
         async def events():
             while not await request.is_disconnected():
-                report, _ = generate_report(min_price, max_price)
+                report, _ = generate_report_with_filters(
+                    min_price, max_price, symbol_query, name_query
+                )
                 payload = json.dumps(report_payload(report), ensure_ascii=False)
                 yield f"event: report\ndata: {payload}\n\n"
                 await asyncio.sleep(3)
 
         return StreamingResponse(events(), media_type="text/event-stream")
+
+    @app.post("/api/favorites/{symbol}")
+    def add_favorite(symbol: str):
+        store.set_focus(symbol, True)
+        return {"favorites": sorted(store.focused_symbols())}
+
+    @app.delete("/api/favorites/{symbol}")
+    def remove_favorite(symbol: str):
+        store.set_focus(symbol, False)
+        return {"favorites": sorted(store.focused_symbols())}
 
     return app
 

@@ -55,6 +55,14 @@
           最高价
           <input type="number" step="0.01" min="0" name="max_price" value="{{ settings.max_price }}">
         </label>
+        <label>
+          股票代码
+          <input type="search" name="symbol_query" value="{{ symbol_query }}" placeholder="输入代码">
+        </label>
+        <label>
+          股票名称
+          <input type="search" name="name_query" value="{{ name_query }}" placeholder="如 平安">
+        </label>
         <label>标签 <select><option>全部</option><option>强烈关注</option><option>观察</option></select></label>
         <label>只看强烈关注 <input type="checkbox"></label>
         <button type="submit">应用</button>
@@ -64,6 +72,37 @@
       </div>
 
       <section class="table-wrap">
+        <h2>自选空间</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>当前价</th>
+              <th>当日涨幅</th>
+              <th>综合分</th>
+              <th>标签</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="favorite-rows">
+            {% for item in report.favorite_candidates %}
+              <tr>
+                <td>{{ item.symbol }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ "%.2f"|format(item.current_price) }}</td>
+                <td class="{{ 'rise' if item.daily_pct_change >= 0 else 'fall' }}">{{ "%.2f"|format(item.daily_pct_change) }}%</td>
+                <td>{{ "%.2f"|format(item.score) }}</td>
+                <td>{{ item.label.value }}</td>
+                <td><button type="button" class="favorite-toggle" data-symbol="{{ item.symbol }}" data-favorite="true">移出自选</button></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="table-wrap">
+        <h2>候选股票</h2>
         <table>
           <thead>
             <tr>
@@ -81,6 +120,7 @@
               <th>目标</th>
               <th>触发条件</th>
               <th>评分理由</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody id="candidate-rows">
@@ -100,6 +140,11 @@
                 <td>{% if item.trade_plan %}{{ item.trade_plan.target_price }}{% else %}-{% endif %}</td>
                 <td>{{ item.trade_plan.trigger if item.trade_plan else item.reason }}</td>
                 <td>{{ item.reason }}</td>
+                <td>
+                  <button type="button" class="favorite-toggle" data-symbol="{{ item.symbol }}" data-favorite="{{ 'true' if item.is_favorite else 'false' }}">
+                    {{ "移出自选" if item.is_favorite else "加入自选" }}
+                  </button>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -111,6 +156,7 @@
       const statusText = document.getElementById("watch-status-text");
       const manualRefresh = document.getElementById("manual-refresh");
       const rowsTarget = document.getElementById("candidate-rows");
+      const favoriteRowsTarget = document.getElementById("favorite-rows");
 
       function fmtNumber(value, digits = 2) {
         return Number(value || 0).toFixed(digits);
@@ -153,6 +199,21 @@
               <td>${planCell(plan, "target_price")}</td>
               <td>${plan ? text(plan.trigger) : text(item.reason)}</td>
               <td>${text(item.reason)}</td>
+              <td><button type="button" class="favorite-toggle" data-symbol="${text(item.symbol)}" data-favorite="${item.is_favorite ? "true" : "false"}">${item.is_favorite ? "移出自选" : "加入自选"}</button></td>
+            </tr>
+          `;
+        }).join("");
+        favoriteRowsTarget.innerHTML = report.favorite_candidates.map((item) => {
+          const changeClass = Number(item.daily_pct_change) >= 0 ? "rise" : "fall";
+          return `
+            <tr>
+              <td>${text(item.symbol)}</td>
+              <td>${text(item.name)}</td>
+              <td>${fmtNumber(item.current_price)}</td>
+              <td class="${changeClass}">${fmtNumber(item.daily_pct_change)}%</td>
+              <td>${fmtNumber(item.score)}</td>
+              <td>${text(item.label)}</td>
+              <td><button type="button" class="favorite-toggle" data-symbol="${text(item.symbol)}" data-favorite="true">移出自选</button></td>
             </tr>
           `;
         }).join("");
@@ -163,6 +224,8 @@
         const params = new URLSearchParams({
           min_price: page.dataset.minPrice || "3",
           max_price: page.dataset.maxPrice || "60",
+          symbol_query: new URLSearchParams(window.location.search).get("symbol_query") || "",
+          name_query: new URLSearchParams(window.location.search).get("name_query") || "",
         });
         const events = new EventSource(`/api/watch/events?${params.toString()}`);
         events.addEventListener("report", (event) => {
@@ -181,6 +244,18 @@
             ? `已后台刷新 ${payload.refreshed_count} 条行情`
             : "东方财富暂不可用，继续显示已有数据";
           manualRefresh.disabled = false;
+        });
+        document.addEventListener("click", async (event) => {
+          const button = event.target.closest(".favorite-toggle");
+          if (!button) {
+            return;
+          }
+          const symbol = button.dataset.symbol;
+          const isFavorite = button.dataset.favorite === "true";
+          button.disabled = true;
+          await fetch(`/api/favorites/${symbol}`, { method: isFavorite ? "DELETE" : "POST" });
+          const reportResponse = await fetch(`/api/watch/report?${params.toString()}`);
+          renderReport(await reportResponse.json());
         });
       }
     </script>

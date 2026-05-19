@@ -201,3 +201,32 @@ def test_watch_refresh_api_updates_without_redirect(tmp_path):
     assert payload["status"] == "success"
     assert payload["refreshed_count"] == 7
     assert payload["report"]["candidates"]
+
+
+def test_dashboard_supports_symbol_name_search_and_favorite_space(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    add_response = client.post("/api/favorites/000001")
+    response = client.get("/?symbol_query=000&name_query=银行")
+
+    assert add_response.status_code == 200
+    assert response.status_code == 200
+    assert 'name="symbol_query"' in response.text
+    assert 'value="000"' in response.text
+    assert 'name="name_query"' in response.text
+    assert 'value="银行"' in response.text
+    assert "自选空间" in response.text
+    assert "000001" in response.text
+    assert "移出自选" in response.text
+
+
+def test_favorite_api_toggles_focus_symbol(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    add_response = client.post("/api/favorites/000001")
+    delete_response = client.delete("/api/favorites/000001")
+
+    assert add_response.status_code == 200
+    assert add_response.json()["favorites"] == ["000001"]
+    assert delete_response.status_code == 200
+    assert delete_response.json()["favorites"] == []

@@ -74,6 +74,7 @@ class CandidateScore(BaseModel):
     name: str
     current_price: float
     daily_pct_change: float
+    is_favorite: bool = False
     score: float = Field(ge=0, le=100)
     next_day_up_probability: float = Field(ge=0, le=1)
     three_day_up_probability: float = Field(ge=0, le=1)
@@ -97,3 +98,4 @@ class DashboardReport(BaseModel):
     price_range: tuple[float, float]
     data_status: list[DataStatusRecord]
     candidates: list[CandidateScore]
+    favorite_candidates: list[CandidateScore] = []
