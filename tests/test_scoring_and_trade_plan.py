@@ -3,6 +3,7 @@ from datetime import date
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.domain.models import CandidateLabel, StockQuote
 from gupiaofenxi.pipeline.scoring import score_candidate
+from gupiaofenxi.pipeline.historical_prediction import PredictionEstimate
 
 
 def make_quote(close=24.5, pct_change=2.1, amount=180000000):
@@ -41,3 +42,20 @@ def test_score_candidate_marks_price_mismatch():
 
     assert candidate.label == CandidateLabel.PRICE_MISMATCH
     assert candidate.trade_plan is None
+
+
+def test_score_candidate_uses_historical_prediction_estimate():
+    estimate = PredictionEstimate(
+        next_day_up_probability=0.61,
+        three_day_up_probability=0.68,
+        expected_return=2.35,
+        sample_count=12,
+        source="history",
+    )
+
+    candidate = score_candidate(make_quote(), AppSettings(), prediction_estimate=estimate)
+
+    assert candidate.next_day_up_probability == 0.61
+    assert candidate.three_day_up_probability == 0.68
+    assert candidate.expected_return == 2.35
+    assert "12个历史相似样本" in candidate.reason

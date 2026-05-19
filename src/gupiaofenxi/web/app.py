@@ -14,6 +14,7 @@ from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefreshError, EastmoneyR
 from gupiaofenxi.data.fallback_provider import FallbackDataProvider
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport
+from gupiaofenxi.pipeline.historical_prediction import load_samples_from_reports
 from gupiaofenxi.pipeline.report import build_dashboard_report
 from gupiaofenxi.storage.json_store import JsonStore
 
@@ -71,6 +72,7 @@ def create_app(
             favorite_symbols=favorite_symbols,
             symbol_query=symbol_query,
             name_query=name_query,
+            prediction_samples=load_samples_from_reports(store.root),
             provider=provider_factory(),
         )
         store.save_report(report)

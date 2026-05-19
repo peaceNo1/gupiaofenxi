@@ -242,3 +242,13 @@ def test_favorite_space_uses_same_detail_columns_as_candidates(tmp_path):
     favorite_section = response.text.split("自选空间", 1)[1].split("候选股票", 1)[0]
     for header in ["明日概率", "3 日概率", "预期涨幅", "低吸区间", "止损", "目标", "触发条件", "评分理由"]:
         assert header in favorite_section
+
+
+def test_api_report_reason_mentions_historical_sample_status(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.get("/api/report")
+
+    assert response.status_code == 200
+    reason = response.json()["candidates"][0]["reason"]
+    assert "历史样本" in reason

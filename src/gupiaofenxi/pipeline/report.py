@@ -4,6 +4,7 @@ from pathlib import Path
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import CandidateLabel, DashboardReport
+from gupiaofenxi.pipeline.historical_prediction import HistoricalPrediction, SimilaritySample
 from gupiaofenxi.pipeline.scoring import score_candidate
 from gupiaofenxi.pipeline.strong_pool import build_strong_pool
 
@@ -20,6 +21,15 @@ def _matches_base_filters(quote, settings: AppSettings, manual_exclusions: set[s
     return True
 
 
+def _score_with_history(quote, settings: AppSettings, predictor: HistoricalPrediction):
+    base = score_candidate(quote, settings)
+    return score_candidate(
+        quote,
+        settings,
+        prediction_estimate=predictor.estimate(base.score),
+    )
+
+
 def build_dashboard_report(
     sample_dir: Path,
     settings: AppSettings,
@@ -27,12 +37,21 @@ def build_dashboard_report(
     favorite_symbols: set[str] | None = None,
     symbol_query: str = "",
     name_query: str = "",
+    prediction_samples: list[SimilaritySample | dict] | None = None,
+    prediction_min_samples: int = 8,
     provider=None,
 ) -> DashboardReport:
     favorite_symbols = favorite_symbols or set()
     symbol_query = symbol_query.strip()
     name_query = name_query.strip()
     provider = provider or SampleDataProvider(sample_dir)
+    samples = [
+        sample
+        if isinstance(sample, SimilaritySample)
+        else SimilaritySample(**sample)
+        for sample in (prediction_samples or [])
+    ]
+    predictor = HistoricalPrediction(samples=samples, min_samples=prediction_min_samples)
     quotes, quote_status = provider.load_daily_quotes()
     market_temperature, index_status = provider.load_market_temperature()
     if symbol_query or name_query:
@@ -50,7 +69,7 @@ def build_dashboard_report(
         pool = build_strong_pool(quotes, settings, manual_exclusions)
     candidates = sorted(
         [
-            score_candidate(quote, settings).model_copy(
+            _score_with_history(quote, settings, predictor).model_copy(
                 update={"is_favorite": quote.symbol in favorite_symbols}
             )
             for quote in pool
@@ -60,7 +79,9 @@ def build_dashboard_report(
     )
     favorite_candidates = sorted(
         [
-            score_candidate(quote, settings).model_copy(update={"is_favorite": True})
+            _score_with_history(quote, settings, predictor).model_copy(
+                update={"is_favorite": True}
+            )
             for quote in quotes
             if quote.symbol in favorite_symbols and quote.symbol not in manual_exclusions
         ],

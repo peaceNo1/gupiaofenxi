@@ -44,6 +44,22 @@ def test_build_dashboard_report_searches_before_top_pool_truncation():
     assert [item.symbol for item in report.candidates] == ["000001"]
 
 
+def test_build_dashboard_report_uses_historical_prediction_samples():
+    report = build_dashboard_report(
+        sample_dir=Path("data/sample"),
+        settings=AppSettings(min_price=3, max_price=60),
+        manual_exclusions=set(),
+        prediction_samples=[
+            {"score": 64, "next_day_return": 1.2, "three_day_return": 2.0},
+            {"score": 63, "next_day_return": -0.4, "three_day_return": 1.0},
+        ],
+        prediction_min_samples=2,
+    )
+
+    assert report.candidates[0].expected_return in {1.5, 2.0, 1.0}
+    assert "历史相似样本" in report.candidates[0].reason
+
+
 def test_build_dashboard_report_handles_empty_daily_quotes(tmp_path):
     sample_dir = tmp_path / "sample"
     sample_dir.mkdir()

@@ -1,5 +1,6 @@
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.domain.models import CandidateLabel, CandidateScore, StockQuote
+from gupiaofenxi.pipeline.historical_prediction import PredictionEstimate
 from gupiaofenxi.pipeline.trade_plan import build_trade_plan
 
 
@@ -7,7 +8,11 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def score_candidate(quote: StockQuote, settings: AppSettings) -> CandidateScore:
+def score_candidate(
+    quote: StockQuote,
+    settings: AppSettings,
+    prediction_estimate: PredictionEstimate | None = None,
+) -> CandidateScore:
     if quote.close < settings.min_price or quote.close > settings.max_price:
         return CandidateScore(
             symbol=quote.symbol,
@@ -45,6 +50,18 @@ def score_candidate(quote: StockQuote, settings: AppSettings) -> CandidateScore:
         label = CandidateLabel.WATCH
     else:
         label = CandidateLabel.REJECT
+    if prediction_estimate is None:
+        prediction_estimate = PredictionEstimate(
+            next_day_up_probability=round(_clamp(0.42 + score / 500, 0, 0.78), 4),
+            three_day_up_probability=round(_clamp(0.45 + score / 450, 0, 0.82), 4),
+            expected_return=round((score - 50) / 10, 2),
+            sample_count=0,
+            source="fallback",
+        )
+    if prediction_estimate.source == "history":
+        reason = f"基于{prediction_estimate.sample_count}个历史相似样本统计，结合强弱、回踩位置和成交额"
+    else:
+        reason = "历史样本不足，暂按综合分估算，结合强弱、回踩位置和成交额"
 
     return CandidateScore(
         symbol=quote.symbol,
@@ -52,11 +69,11 @@ def score_candidate(quote: StockQuote, settings: AppSettings) -> CandidateScore:
         current_price=quote.close,
         daily_pct_change=quote.pct_change,
         score=score,
-        next_day_up_probability=round(_clamp(0.42 + score / 500, 0, 0.78), 4),
-        three_day_up_probability=round(_clamp(0.45 + score / 450, 0, 0.82), 4),
-        expected_return=round((score - 50) / 10, 2),
+        next_day_up_probability=prediction_estimate.next_day_up_probability,
+        three_day_up_probability=prediction_estimate.three_day_up_probability,
+        expected_return=prediction_estimate.expected_return,
         label=label,
-        reason="综合考虑强势基础、回踩位置、成交额和历史相似形态",
+        reason=reason,
         strength_score=round(strength_score, 2),
         dip_position_score=round(dip_position_score, 2),
         sentiment_score=round(sentiment_score, 2),
