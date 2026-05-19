@@ -1,8 +1,10 @@
+import asyncio
+import json
 from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -26,6 +28,8 @@ def create_app(
     store_root: Path | None = None,
     provider_factory=None,
     refresher=None,
+    enable_background_watch: bool = False,
+    watch_interval_seconds: float = 5,
 ) -> FastAPI:
     app = FastAPI(title="A 股短线低吸候选仪表盘")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -62,6 +66,34 @@ def create_app(
         )
         store.save_report(report)
         return report, settings
+
+    async def refresh_market_data() -> tuple[str, int]:
+        try:
+            count = await asyncio.to_thread(refresher.refresh)
+            return "success", count
+        except EastmoneyRefreshError:
+            return "error", 0
+        except Exception:
+            return "error", 0
+
+    def report_payload(report: DashboardReport) -> dict:
+        return report.model_dump(mode="json")
+
+    async def watch_loop() -> None:
+        while True:
+            await refresh_market_data()
+            await asyncio.sleep(watch_interval_seconds)
+
+    @app.on_event("startup")
+    async def start_background_watch() -> None:
+        if enable_background_watch:
+            app.state.watch_task = asyncio.create_task(watch_loop())
+
+    @app.on_event("shutdown")
+    async def stop_background_watch() -> None:
+        task = getattr(app.state, "watch_task", None)
+        if task:
+            task.cancel()
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(
@@ -116,7 +148,45 @@ def create_app(
         report, _ = generate_report(min_price, max_price)
         return report
 
+    @app.get("/api/watch/report")
+    def api_watch_report(
+        min_price: float = DEFAULT_SETTINGS.min_price,
+        max_price: float = DEFAULT_SETTINGS.max_price,
+    ):
+        report, _ = generate_report(min_price, max_price)
+        return report
+
+    @app.post("/api/watch/refresh")
+    async def api_watch_refresh(
+        min_price: float = DEFAULT_SETTINGS.min_price,
+        max_price: float = DEFAULT_SETTINGS.max_price,
+    ):
+        status, count = await refresh_market_data()
+        report, _ = generate_report(min_price, max_price)
+        return JSONResponse(
+            {
+                "status": status,
+                "refreshed_count": count,
+                "report": report_payload(report),
+            }
+        )
+
+    @app.get("/api/watch/events")
+    async def api_watch_events(
+        request: Request,
+        min_price: float = DEFAULT_SETTINGS.min_price,
+        max_price: float = DEFAULT_SETTINGS.max_price,
+    ):
+        async def events():
+            while not await request.is_disconnected():
+                report, _ = generate_report(min_price, max_price)
+                payload = json.dumps(report_payload(report), ensure_ascii=False)
+                yield f"event: report\ndata: {payload}\n\n"
+                await asyncio.sleep(3)
+
+        return StreamingResponse(events(), media_type="text/event-stream")
+
     return app
 
 
-app = create_app()
+app = create_app(enable_background_watch=True)

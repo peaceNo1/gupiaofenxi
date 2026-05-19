@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <main class="page" data-watch-refresh="60" data-min-price="{{ settings.min_price }}" data-max-price="{{ settings.max_price }}">
+    <main class="page" data-watch-refresh="3" data-min-price="{{ settings.min_price }}" data-max-price="{{ settings.max_price }}">
       <header class="topbar">
         <div>
           <h1>A 股短线低吸候选仪表盘</h1>
@@ -34,16 +34,16 @@
         </div>
         <div class="watch-status">
           <span class="pulse"></span>
-          <span id="watch-countdown">60</span> 秒后自动刷新东方财富数据
+          <span id="watch-status-text">后台盯盘中，数据自动更新</span>
         </div>
       </section>
 
       <section class="metrics">
-        <div><strong>{{ report.market_temperature }}</strong><span>市场温度</span></div>
-        <div><strong>{{ report.strong_pool_count }}</strong><span>强势池数量</span></div>
-        <div><strong>{{ report.high_score_count }}</strong><span>高分候选</span></div>
-        <div><strong>{{ report.risk_count }}</strong><span>风险票</span></div>
-        <div><strong>{{ report.price_range[0] }}-{{ report.price_range[1] }}</strong><span>价格范围</span></div>
+        <div><strong id="market-temperature">{{ report.market_temperature }}</strong><span>市场温度</span></div>
+        <div><strong id="strong-pool-count">{{ report.strong_pool_count }}</strong><span>强势池数量</span></div>
+        <div><strong id="high-score-count">{{ report.high_score_count }}</strong><span>高分候选</span></div>
+        <div><strong id="risk-count">{{ report.risk_count }}</strong><span>风险票</span></div>
+        <div><strong id="price-range">{{ report.price_range[0] }}-{{ report.price_range[1] }}</strong><span>价格范围</span></div>
       </section>
 
       <form class="filters" method="get" action="/">
@@ -59,9 +59,9 @@
         <label>只看强烈关注 <input type="checkbox"></label>
         <button type="submit">应用</button>
       </form>
-      <form class="refresh-form" method="post" action="/refresh?min_price={{ settings.min_price }}&max_price={{ settings.max_price }}">
-        <button type="submit">刷新东方财富数据</button>
-      </form>
+      <div class="refresh-form">
+        <button type="button" id="manual-refresh">立即刷新东方财富数据</button>
+      </div>
 
       <section class="table-wrap">
         <table>
@@ -83,7 +83,7 @@
               <th>评分理由</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="candidate-rows">
             {% for item in report.candidates %}
               <tr>
                 <td>{{ item.symbol }}</td>
@@ -108,26 +108,80 @@
     </main>
     <script>
       const page = document.querySelector("[data-watch-refresh]");
-      const countdown = document.getElementById("watch-countdown");
-      if (page && countdown) {
-        let seconds = Number(page.dataset.watchRefresh || 60);
-        let refreshing = false;
-        const refreshUrl = new URL("/refresh", window.location.origin);
-        refreshUrl.searchParams.set("min_price", page.dataset.minPrice || "3");
-        refreshUrl.searchParams.set("max_price", page.dataset.maxPrice || "60");
-        const timer = window.setInterval(() => {
-          if (refreshing) {
-            return;
-          }
-          seconds -= 1;
-          countdown.textContent = String(Math.max(seconds, 0));
-          if (seconds <= 0) {
-            refreshing = true;
-            window.clearInterval(timer);
-            countdown.textContent = "正在刷新";
-            window.location.href = refreshUrl.toString();
-          }
-        }, 1000);
+      const statusText = document.getElementById("watch-status-text");
+      const manualRefresh = document.getElementById("manual-refresh");
+      const rowsTarget = document.getElementById("candidate-rows");
+
+      function fmtNumber(value, digits = 2) {
+        return Number(value || 0).toFixed(digits);
+      }
+
+      function fmtPercent(value, digits = 1) {
+        return `${fmtNumber(Number(value || 0) * 100, digits)}%`;
+      }
+
+      function text(value) {
+        return String(value ?? "");
+      }
+
+      function planCell(plan, key) {
+        return plan ? text(plan[key]) : "-";
+      }
+
+      function renderReport(report) {
+        document.getElementById("market-temperature").textContent = text(report.market_temperature);
+        document.getElementById("strong-pool-count").textContent = text(report.strong_pool_count);
+        document.getElementById("high-score-count").textContent = text(report.high_score_count);
+        document.getElementById("risk-count").textContent = text(report.risk_count);
+        document.getElementById("price-range").textContent = `${report.price_range[0]}-${report.price_range[1]}`;
+        rowsTarget.innerHTML = report.candidates.map((item) => {
+          const changeClass = Number(item.daily_pct_change) >= 0 ? "rise" : "fall";
+          const plan = item.trade_plan;
+          return `
+            <tr>
+              <td>${text(item.symbol)}</td>
+              <td>${text(item.name)}</td>
+              <td>${fmtNumber(item.current_price)}</td>
+              <td class="${changeClass}">${fmtNumber(item.daily_pct_change)}%</td>
+              <td>${fmtNumber(item.score)}</td>
+              <td>${fmtPercent(item.next_day_up_probability)}</td>
+              <td>${fmtPercent(item.three_day_up_probability)}</td>
+              <td>${fmtNumber(item.expected_return)}%</td>
+              <td>${text(item.label)}</td>
+              <td>${plan ? `${plan.buy_low}-${plan.buy_high}` : "-"}</td>
+              <td>${planCell(plan, "stop_loss")}</td>
+              <td>${planCell(plan, "target_price")}</td>
+              <td>${plan ? text(plan.trigger) : text(item.reason)}</td>
+              <td>${text(item.reason)}</td>
+            </tr>
+          `;
+        }).join("");
+        statusText.textContent = `后台盯盘中，最新更新 ${new Date().toLocaleTimeString()}`;
+      }
+
+      if (page) {
+        const params = new URLSearchParams({
+          min_price: page.dataset.minPrice || "3",
+          max_price: page.dataset.maxPrice || "60",
+        });
+        const events = new EventSource(`/api/watch/events?${params.toString()}`);
+        events.addEventListener("report", (event) => {
+          renderReport(JSON.parse(event.data));
+        });
+        events.onerror = () => {
+          statusText.textContent = "后台连接中断，正在等待恢复";
+        };
+        manualRefresh.addEventListener("click", async () => {
+          manualRefresh.disabled = true;
+          statusText.textContent = "正在后台拉取东方财富数据";
+          const response = await fetch(`/api/watch/refresh?${params.toString()}`, { method: "POST" });
+          const payload = await response.json();
+          renderReport(payload.report);
+          statusText.textContent = payload.status === "success"
+            ? `已后台刷新 ${payload.refreshed_count} 条行情`
+            : "东方财富暂不可用，继续显示已有数据";
+          manualRefresh.disabled = false;
+        });
       }
     </script>
   </body>

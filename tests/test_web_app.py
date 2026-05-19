@@ -152,9 +152,8 @@ def test_refresh_button_is_rendered(tmp_path):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "刷新东方财富数据" in response.text
-    assert 'method="post"' in response.text
-    assert "/refresh" in response.text
+    assert "立即刷新东方财富数据" in response.text
+    assert "/api/watch/refresh" in response.text
 
 
 def test_dashboard_renders_watch_mode_and_daily_change_column(tmp_path):
@@ -165,8 +164,40 @@ def test_dashboard_renders_watch_mode_and_daily_change_column(tmp_path):
     assert response.status_code == 200
     assert "实时盯盘" in response.text
     assert "当日涨幅" in response.text
-    assert 'data-watch-refresh="60"' in response.text
-    assert "let refreshing = false;" in response.text
-    assert "window.clearInterval(timer);" in response.text
-    assert "正在刷新" in response.text
+    assert 'data-watch-refresh="3"' in response.text
+    assert "后台盯盘中，数据自动更新" in response.text
     assert "/refresh?min_price={{" not in response.text
+
+
+def test_dashboard_uses_background_watch_without_page_navigation(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.get("/?min_price=3&max_price=13")
+
+    assert response.status_code == 200
+    assert "/api/watch/events" in response.text
+    assert "/api/watch/refresh" in response.text
+    assert "new EventSource" in response.text
+    assert "window.location.href" not in response.text
+    assert '<tbody id="candidate-rows">' in response.text
+    assert "renderReport" in response.text
+
+
+def test_watch_refresh_api_updates_without_redirect(tmp_path):
+    refresher = FakeRefresher(count=7)
+    client = TestClient(
+        create_app(
+            store_root=tmp_path,
+            provider_factory=sample_provider_factory,
+            refresher=refresher,
+        )
+    )
+
+    response = client.post("/api/watch/refresh?min_price=3&max_price=13")
+
+    assert refresher.called is True
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["refreshed_count"] == 7
+    assert payload["report"]["candidates"]
