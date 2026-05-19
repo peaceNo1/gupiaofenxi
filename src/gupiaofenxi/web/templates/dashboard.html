@@ -81,7 +81,15 @@
               <th>当前价</th>
               <th>当日涨幅</th>
               <th>综合分</th>
+              <th>明日概率</th>
+              <th>3 日概率</th>
+              <th>预期涨幅</th>
               <th>标签</th>
+              <th>低吸区间</th>
+              <th>止损</th>
+              <th>目标</th>
+              <th>触发条件</th>
+              <th>评分理由</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -93,7 +101,15 @@
                 <td>{{ "%.2f"|format(item.current_price) }}</td>
                 <td class="{{ 'rise' if item.daily_pct_change >= 0 else 'fall' }}">{{ "%.2f"|format(item.daily_pct_change) }}%</td>
                 <td>{{ "%.2f"|format(item.score) }}</td>
+                <td>{{ "%.1f"|format(item.next_day_up_probability * 100) }}%</td>
+                <td>{{ "%.1f"|format(item.three_day_up_probability * 100) }}%</td>
+                <td>{{ "%.2f"|format(item.expected_return) }}%</td>
                 <td>{{ item.label.value }}</td>
+                <td>{% if item.trade_plan %}{{ item.trade_plan.buy_low }}-{{ item.trade_plan.buy_high }}{% else %}-{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ item.trade_plan.stop_loss }}{% else %}-{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ item.trade_plan.target_price }}{% else %}-{% endif %}</td>
+                <td>{{ item.trade_plan.trigger if item.trade_plan else item.reason }}</td>
+                <td>{{ item.reason }}</td>
                 <td><button type="button" class="favorite-toggle" data-symbol="{{ item.symbol }}" data-favorite="true">移出自选</button></td>
               </tr>
             {% endfor %}
@@ -205,6 +221,7 @@
         }).join("");
         favoriteRowsTarget.innerHTML = report.favorite_candidates.map((item) => {
           const changeClass = Number(item.daily_pct_change) >= 0 ? "rise" : "fall";
+          const plan = item.trade_plan;
           return `
             <tr>
               <td>${text(item.symbol)}</td>
@@ -212,7 +229,15 @@
               <td>${fmtNumber(item.current_price)}</td>
               <td class="${changeClass}">${fmtNumber(item.daily_pct_change)}%</td>
               <td>${fmtNumber(item.score)}</td>
+              <td>${fmtPercent(item.next_day_up_probability)}</td>
+              <td>${fmtPercent(item.three_day_up_probability)}</td>
+              <td>${fmtNumber(item.expected_return)}%</td>
               <td>${text(item.label)}</td>
+              <td>${plan ? `${plan.buy_low}-${plan.buy_high}` : "-"}</td>
+              <td>${planCell(plan, "stop_loss")}</td>
+              <td>${planCell(plan, "target_price")}</td>
+              <td>${plan ? text(plan.trigger) : text(item.reason)}</td>
+              <td>${text(item.reason)}</td>
               <td><button type="button" class="favorite-toggle" data-symbol="${text(item.symbol)}" data-favorite="true">移出自选</button></td>
             </tr>
           `;
