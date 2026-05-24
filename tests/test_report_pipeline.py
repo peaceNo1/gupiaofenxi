@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from gupiaofenxi.config import AppSettings
+from gupiaofenxi.domain.models import Position
 from gupiaofenxi.pipeline.report import build_dashboard_report
 
 
@@ -58,6 +59,26 @@ def test_build_dashboard_report_uses_historical_prediction_samples():
 
     assert report.candidates[0].expected_return in {1.5, 2.0, 1.0}
     assert "历史相似样本" in report.candidates[0].reason
+
+
+def test_build_dashboard_report_calculates_positions_and_alerts():
+    report = build_dashboard_report(
+        sample_dir=Path("data/sample"),
+        settings=AppSettings(min_price=3, max_price=60),
+        manual_exclusions=set(),
+        favorite_symbols={"000001"},
+        positions=[
+            Position(symbol="000001", name="平安银行", cost_price=9.6, quantity=1000),
+        ],
+    )
+
+    position = report.positions[0]
+    assert position.symbol == "000001"
+    assert position.market_value == 10500
+    assert position.profit == 900
+    assert position.profit_pct == 9.38
+    assert position.status == "止盈"
+    assert report.alerts
 
 
 def test_build_dashboard_report_handles_empty_daily_quotes(tmp_path):

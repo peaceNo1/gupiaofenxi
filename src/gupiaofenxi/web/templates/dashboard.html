@@ -72,6 +72,58 @@
       </div>
 
       <section class="table-wrap">
+        <h2>提醒</h2>
+        <div id="alert-rows" class="alerts">
+          {% for item in report.alerts %}
+            <div class="alert-item {{ item.level }}">{{ item.symbol }} {{ item.name }}：{{ item.message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="table-wrap">
+        <h2>持仓管理</h2>
+        <form class="filters" id="position-form">
+          <label>代码 <input name="symbol" placeholder="输入代码" required></label>
+          <label>名称 <input name="name" placeholder="股票名称"></label>
+          <label>成本价 <input name="cost_price" type="number" min="0" step="0.01" required></label>
+          <label>数量 <input name="quantity" type="number" min="100" step="100" required></label>
+          <button type="submit">保存持仓</button>
+        </form>
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>成本价</th>
+              <th>数量</th>
+              <th>当前价</th>
+              <th>市值</th>
+              <th>浮盈浮亏</th>
+              <th>收益率</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="position-rows">
+            {% for item in report.positions %}
+              <tr>
+                <td>{{ item.symbol }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ "%.2f"|format(item.cost_price) }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ "%.2f"|format(item.current_price) }}</td>
+                <td>{{ "%.2f"|format(item.market_value) }}</td>
+                <td class="{{ 'rise' if item.profit >= 0 else 'fall' }}">{{ "%.2f"|format(item.profit) }}</td>
+                <td class="{{ 'rise' if item.profit_pct >= 0 else 'fall' }}">{{ "%.2f"|format(item.profit_pct) }}%</td>
+                <td>{{ item.status }}</td>
+                <td><button type="button" class="position-delete" data-symbol="{{ item.symbol }}">删除</button></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="table-wrap">
         <h2>自选空间</h2>
         <table>
           <thead>
@@ -173,6 +225,9 @@
       const manualRefresh = document.getElementById("manual-refresh");
       const rowsTarget = document.getElementById("candidate-rows");
       const favoriteRowsTarget = document.getElementById("favorite-rows");
+      const positionRowsTarget = document.getElementById("position-rows");
+      const alertRowsTarget = document.getElementById("alert-rows");
+      const positionForm = document.getElementById("position-form");
 
       function fmtNumber(value, digits = 2) {
         return Number(value || 0).toFixed(digits);
@@ -242,6 +297,26 @@
             </tr>
           `;
         }).join("");
+        positionRowsTarget.innerHTML = report.positions.map((item) => {
+          const profitClass = Number(item.profit) >= 0 ? "rise" : "fall";
+          return `
+            <tr>
+              <td>${text(item.symbol)}</td>
+              <td>${text(item.name)}</td>
+              <td>${fmtNumber(item.cost_price)}</td>
+              <td>${text(item.quantity)}</td>
+              <td>${fmtNumber(item.current_price)}</td>
+              <td>${fmtNumber(item.market_value)}</td>
+              <td class="${profitClass}">${fmtNumber(item.profit)}</td>
+              <td class="${profitClass}">${fmtNumber(item.profit_pct)}%</td>
+              <td>${text(item.status)}</td>
+              <td><button type="button" class="position-delete" data-symbol="${text(item.symbol)}">删除</button></td>
+            </tr>
+          `;
+        }).join("");
+        alertRowsTarget.innerHTML = report.alerts.map((item) => {
+          return `<div class="alert-item ${text(item.level)}">${text(item.symbol)} ${text(item.name)}：${text(item.message)}</div>`;
+        }).join("");
         statusText.textContent = `后台盯盘中，最新更新 ${new Date().toLocaleTimeString()}`;
       }
 
@@ -279,6 +354,32 @@
           const isFavorite = button.dataset.favorite === "true";
           button.disabled = true;
           await fetch(`/api/favorites/${symbol}`, { method: isFavorite ? "DELETE" : "POST" });
+          const reportResponse = await fetch(`/api/watch/report?${params.toString()}`);
+          renderReport(await reportResponse.json());
+        });
+        document.addEventListener("click", async (event) => {
+          const button = event.target.closest(".position-delete");
+          if (!button) {
+            return;
+          }
+          await fetch(`/api/positions/${button.dataset.symbol}`, { method: "DELETE" });
+          const reportResponse = await fetch(`/api/watch/report?${params.toString()}`);
+          renderReport(await reportResponse.json());
+        });
+        positionForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const form = new FormData(positionForm);
+          await fetch("/api/positions", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              symbol: form.get("symbol"),
+              name: form.get("name") || "",
+              cost_price: Number(form.get("cost_price")),
+              quantity: Number(form.get("quantity")),
+            }),
+          });
+          positionForm.reset();
           const reportResponse = await fetch(`/api/watch/report?${params.toString()}`);
           renderReport(await reportResponse.json());
         });

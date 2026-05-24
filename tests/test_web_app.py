@@ -252,3 +252,27 @@ def test_api_report_reason_mentions_historical_sample_status(tmp_path):
     assert response.status_code == 200
     reason = response.json()["candidates"][0]["reason"]
     assert "历史样本" in reason
+
+
+def test_position_api_and_dashboard_render_positions(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    add_response = client.post(
+        "/api/positions",
+        json={"symbol": "000001", "name": "平安银行", "cost_price": 9.6, "quantity": 1000},
+    )
+    page_response = client.get("/")
+    report_response = client.get("/api/watch/report")
+
+    assert add_response.status_code == 200
+    assert add_response.json()["positions"][0]["symbol"] == "000001"
+    assert page_response.status_code == 200
+    assert "持仓管理" in page_response.text
+    assert "浮盈浮亏" in page_response.text
+    payload = report_response.json()
+    assert payload["positions"][0]["profit"] == 900
+    assert payload["alerts"]
+
+    delete_response = client.delete("/api/positions/000001")
+    assert delete_response.status_code == 200
+    assert delete_response.json()["positions"] == []

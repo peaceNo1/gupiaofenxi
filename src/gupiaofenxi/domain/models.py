@@ -61,6 +61,32 @@ class ManualOverride(BaseModel):
     note: str = ""
 
 
+class Position(BaseModel):
+    symbol: str
+    name: str = ""
+    cost_price: float = Field(gt=0)
+    quantity: int = Field(gt=0)
+
+
+class PositionSnapshot(BaseModel):
+    symbol: str
+    name: str
+    cost_price: float
+    quantity: int
+    current_price: float
+    market_value: float
+    profit: float
+    profit_pct: float
+    status: str
+
+
+class AlertItem(BaseModel):
+    symbol: str
+    name: str
+    level: str
+    message: str
+
+
 class TradePlan(BaseModel):
     buy_low: float
     buy_high: float
@@ -99,3 +125,5 @@ class DashboardReport(BaseModel):
     data_status: list[DataStatusRecord]
     candidates: list[CandidateScore]
     favorite_candidates: list[CandidateScore] = []
+    positions: list[PositionSnapshot] = []
+    alerts: list[AlertItem] = []

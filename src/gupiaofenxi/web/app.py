@@ -13,7 +13,7 @@ from gupiaofenxi.data.csv_provider import CsvDataProvider
 from gupiaofenxi.data.eastmoney_refresh import EastmoneyRefreshError, EastmoneyRefresher
 from gupiaofenxi.data.fallback_provider import FallbackDataProvider
 from gupiaofenxi.data.sample_provider import SampleDataProvider
-from gupiaofenxi.domain.models import DashboardReport
+from gupiaofenxi.domain.models import DashboardReport, Position
 from gupiaofenxi.pipeline.historical_prediction import load_samples_from_reports
 from gupiaofenxi.pipeline.report import build_dashboard_report
 from gupiaofenxi.storage.json_store import JsonStore
@@ -65,6 +65,7 @@ def create_app(
         overrides = store.load_manual_overrides()
         manual_exclusions = {symbol for symbol, override in overrides.items() if override.excluded}
         favorite_symbols = {symbol for symbol, override in overrides.items() if override.focus}
+        positions = list(store.load_positions().values())
         report = build_dashboard_report(
             sample_dir=sample_data_dir,
             settings=settings,
@@ -73,6 +74,7 @@ def create_app(
             symbol_query=symbol_query,
             name_query=name_query,
             prediction_samples=load_samples_from_reports(store.root),
+            positions=positions,
             provider=provider_factory(),
         )
         store.save_report(report)
@@ -220,6 +222,16 @@ def create_app(
     def remove_favorite(symbol: str):
         store.set_focus(symbol, False)
         return {"favorites": sorted(store.focused_symbols())}
+
+    @app.post("/api/positions")
+    def upsert_position(position: Position):
+        store.upsert_position(position)
+        return {"positions": [item.model_dump() for item in store.load_positions().values()]}
+
+    @app.delete("/api/positions/{symbol}")
+    def delete_position(symbol: str):
+        store.delete_position(symbol)
+        return {"positions": [item.model_dump() for item in store.load_positions().values()]}
 
     return app
 
