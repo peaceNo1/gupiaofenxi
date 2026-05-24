@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 
 from gupiaofenxi.config import AppSettings
 from gupiaofenxi.data.csv_provider import CsvDataProvider
@@ -22,6 +23,13 @@ from gupiaofenxi.storage.json_store import JsonStore
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_SETTINGS = AppSettings()
+
+
+class PositionInput(BaseModel):
+    symbol: str = ""
+    name: str = ""
+    cost_price: float = Field(gt=0)
+    quantity: int = Field(gt=0)
 
 
 def create_app(
@@ -91,6 +99,51 @@ def create_app(
 
     def report_payload(report: DashboardReport) -> dict:
         return report.model_dump(mode="json")
+
+    def stock_options() -> list[dict[str, str]]:
+        try:
+            quotes, _ = provider_factory().load_daily_quotes()
+        except Exception:
+            quotes, _ = SampleDataProvider(sample_data_dir).load_daily_quotes()
+        seen: set[str] = set()
+        options: list[dict[str, str]] = []
+        for quote in quotes:
+            symbol = quote.symbol.zfill(6)
+            if symbol in seen:
+                continue
+            seen.add(symbol)
+            options.append({"symbol": symbol, "name": quote.name})
+        return options
+
+    def resolve_position(payload: PositionInput) -> Position:
+        symbol = payload.symbol.strip()
+        symbol = symbol.zfill(6) if symbol else ""
+        name = payload.name.strip()
+        options = stock_options()
+        by_symbol = {item["symbol"]: item for item in options}
+
+        if symbol and not name and symbol in by_symbol:
+            name = by_symbol[symbol]["name"]
+
+        if name and not symbol:
+            exact_match = next((item for item in options if item["name"] == name), None)
+            fuzzy_match = next((item for item in options if name in item["name"]), None)
+            match = exact_match or fuzzy_match
+            if match:
+                symbol = match["symbol"]
+                name = match["name"]
+
+        if not symbol:
+            raise HTTPException(status_code=400, detail="请填写有效股票代码或名称")
+        if not name:
+            name = by_symbol.get(symbol, {}).get("name", symbol)
+
+        return Position(
+            symbol=symbol,
+            name=name,
+            cost_price=payload.cost_price,
+            quantity=payload.quantity,
+        )
 
     async def watch_loop() -> None:
         while True:
@@ -223,8 +276,21 @@ def create_app(
         store.set_focus(symbol, False)
         return {"favorites": sorted(store.focused_symbols())}
 
+    @app.get("/api/stocks/search")
+    def search_stocks(q: str = ""):
+        keyword = q.strip()
+        options = stock_options()
+        if keyword:
+            options = [
+                item
+                for item in options
+                if keyword in item["symbol"] or keyword in item["name"]
+            ]
+        return {"stocks": options[:30]}
+
     @app.post("/api/positions")
-    def upsert_position(position: Position):
+    def upsert_position(position: PositionInput):
+        position = resolve_position(position)
         store.upsert_position(position)
         return {"positions": [item.model_dump() for item in store.load_positions().values()]}
 

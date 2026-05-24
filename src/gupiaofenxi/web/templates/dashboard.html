@@ -83,11 +83,13 @@
       <section class="table-wrap">
         <h2>持仓管理</h2>
         <form class="filters" id="position-form">
-          <label>代码 <input name="symbol" placeholder="输入代码" required></label>
-          <label>名称 <input name="name" placeholder="股票名称"></label>
+          <label>代码 <input id="position-symbol" name="symbol" list="position-symbol-options" placeholder="输入代码"></label>
+          <label>名称 <input id="position-name" name="name" list="position-name-options" placeholder="股票名称"></label>
           <label>成本价 <input name="cost_price" type="number" min="0" step="0.01" required></label>
           <label>数量 <input name="quantity" type="number" min="100" step="100" required></label>
           <button type="submit">保存持仓</button>
+          <datalist id="position-symbol-options"></datalist>
+          <datalist id="position-name-options"></datalist>
         </form>
         <table>
           <thead>
@@ -228,6 +230,11 @@
       const positionRowsTarget = document.getElementById("position-rows");
       const alertRowsTarget = document.getElementById("alert-rows");
       const positionForm = document.getElementById("position-form");
+      const positionSymbolInput = document.getElementById("position-symbol");
+      const positionNameInput = document.getElementById("position-name");
+      const positionSymbolOptions = document.getElementById("position-symbol-options");
+      const positionNameOptions = document.getElementById("position-name-options");
+      const stockOptions = [];
 
       function fmtNumber(value, digits = 2) {
         return Number(value || 0).toFixed(digits);
@@ -243,6 +250,66 @@
 
       function planCell(plan, key) {
         return plan ? text(plan[key]) : "-";
+      }
+
+      function normalizeSymbol(value) {
+        const digits = String(value || "").replace(/\D/g, "");
+        return digits ? digits.padStart(6, "0").slice(-6) : "";
+      }
+
+      function renderStockOptions() {
+        positionSymbolOptions.replaceChildren(...stockOptions.map((item) => {
+          const option = document.createElement("option");
+          option.value = item.symbol;
+          option.textContent = item.name;
+          return option;
+        }));
+        positionNameOptions.replaceChildren(...stockOptions.map((item) => {
+          const option = document.createElement("option");
+          option.value = item.name;
+          option.textContent = item.symbol;
+          return option;
+        }));
+      }
+
+      async function loadStockOptions(keyword) {
+        const response = await fetch(`/api/stocks/search?q=${encodeURIComponent(keyword || "")}`);
+        const payload = await response.json();
+        stockOptions.splice(0, stockOptions.length, ...(payload.stocks || []));
+        renderStockOptions();
+      }
+
+      async function completePositionBySymbol() {
+        if (!positionSymbolInput || !positionNameInput) {
+          return;
+        }
+        const symbol = normalizeSymbol(positionSymbolInput.value);
+        if (!symbol) {
+          return;
+        }
+        await loadStockOptions(symbol);
+        const match = stockOptions.find((item) => item.symbol === symbol);
+        if (match) {
+          positionSymbolInput.value = match.symbol;
+          positionNameInput.value = match.name;
+        }
+      }
+
+      async function completePositionByName() {
+        if (!positionSymbolInput || !positionNameInput) {
+          return;
+        }
+        const keyword = positionNameInput.value.trim();
+        if (!keyword) {
+          return;
+        }
+        await loadStockOptions(keyword);
+        const match = stockOptions.find((item) => item.name === keyword)
+          || stockOptions.find((item) => item.name.includes(keyword));
+        if (match) {
+          positionSymbolInput.value = match.symbol;
+          positionNameInput.value = match.name;
+        }
       }
 
       function renderReport(report) {
@@ -345,6 +412,10 @@
             : "东方财富暂不可用，继续显示已有数据";
           manualRefresh.disabled = false;
         });
+        positionSymbolInput.addEventListener("input", completePositionBySymbol);
+        positionSymbolInput.addEventListener("change", completePositionBySymbol);
+        positionNameInput.addEventListener("input", completePositionByName);
+        positionNameInput.addEventListener("change", completePositionByName);
         document.addEventListener("click", async (event) => {
           const button = event.target.closest(".favorite-toggle");
           if (!button) {

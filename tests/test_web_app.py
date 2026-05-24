@@ -276,3 +276,44 @@ def test_position_api_and_dashboard_render_positions(tmp_path):
     delete_response = client.delete("/api/positions/000001")
     assert delete_response.status_code == 200
     assert delete_response.json()["positions"] == []
+
+
+def test_position_api_fills_name_from_symbol(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.post(
+        "/api/positions",
+        json={"symbol": "000001", "cost_price": 9.6, "quantity": 1000},
+    )
+
+    assert response.status_code == 200
+    position = response.json()["positions"][0]
+    assert position["symbol"] == "000001"
+    assert position["name"] == "平安银行"
+
+
+def test_position_api_fills_symbol_from_name(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.post(
+        "/api/positions",
+        json={"name": "平安银行", "cost_price": 9.6, "quantity": 1000},
+    )
+
+    assert response.status_code == 200
+    position = response.json()["positions"][0]
+    assert position["symbol"] == "000001"
+    assert position["name"] == "平安银行"
+
+
+def test_dashboard_renders_position_autocomplete_controls(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'id="position-symbol"' in response.text
+    assert 'id="position-name"' in response.text
+    assert "const stockOptions =" in response.text
+    assert "completePositionBySymbol" in response.text
+    assert "completePositionByName" in response.text
