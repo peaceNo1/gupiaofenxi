@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from gupiaofenxi.domain.models import DashboardReport, ManualOverride, Position
+from gupiaofenxi.domain.models import DashboardReport, ManualOverride, Position, ReviewState
 
 
 class JsonStore:
@@ -16,6 +16,10 @@ class JsonStore:
     @property
     def positions_path(self) -> Path:
         return self.root / "positions.json"
+
+    @property
+    def reviews_path(self) -> Path:
+        return self.root / "reviews.json"
 
     def save_manual_overrides(self, overrides: list[ManualOverride]) -> None:
         payload = [override.model_dump() for override in overrides]
@@ -72,3 +76,15 @@ class JsonStore:
         path = self.root / f"report-{report.report_date.isoformat()}.json"
         path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         return path
+
+    def load_review_state(self) -> ReviewState:
+        if not self.reviews_path.exists():
+            return ReviewState()
+        payload = json.loads(self.reviews_path.read_text(encoding="utf-8"))
+        return ReviewState(**payload)
+
+    def save_review_state(self, state: ReviewState) -> None:
+        self.reviews_path.write_text(
+            state.model_dump_json(indent=2),
+            encoding="utf-8",
+        )

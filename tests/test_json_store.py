@@ -1,6 +1,13 @@
+from datetime import date
 from pathlib import Path
 
-from gupiaofenxi.domain.models import ManualOverride, Position
+from gupiaofenxi.domain.models import (
+    CandidateReview,
+    ManualOverride,
+    Position,
+    ReviewPrice,
+    ReviewState,
+)
 from gupiaofenxi.storage.json_store import JsonStore
 
 
@@ -41,3 +48,37 @@ def test_json_store_persists_positions(tmp_path: Path):
 
     store.delete_position("000001")
     assert "000001" not in store.load_positions()
+
+
+def test_json_store_persists_review_state(tmp_path: Path):
+    store = JsonStore(tmp_path)
+    state = ReviewState(
+        reviews=[
+            CandidateReview(
+                report_date=date(2026, 5, 20),
+                symbol="000001",
+                name="平安银行",
+                start_price=10.0,
+                score=76.5,
+                label="强烈关注",
+                next_day_up_probability=0.57,
+                three_day_up_probability=0.62,
+                expected_return=2.6,
+            )
+        ],
+        prices=[
+            ReviewPrice(
+                trade_date=date(2026, 5, 21),
+                symbol="000001",
+                close=10.5,
+                high=10.9,
+                low=9.8,
+            )
+        ],
+    )
+
+    store.save_review_state(state)
+    loaded = store.load_review_state()
+
+    assert loaded.reviews[0].symbol == "000001"
+    assert loaded.prices[0].close == 10.5
