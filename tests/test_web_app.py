@@ -1,10 +1,11 @@
+from datetime import date
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from gupiaofenxi.data.csv_provider import CsvDataProvider
 from gupiaofenxi.data.sample_provider import SampleDataProvider
-from gupiaofenxi.domain.models import ManualOverride
+from gupiaofenxi.domain.models import CandidateReview, ManualOverride, ReviewState, ReviewStatus
 from gupiaofenxi.storage.json_store import JsonStore
 from gupiaofenxi.web.app import create_app
 
@@ -75,13 +76,57 @@ def test_dashboard_generation_updates_candidate_reviews(tmp_path):
 
 
 def test_dashboard_renders_review_summary(tmp_path):
-    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+    JsonStore(tmp_path).save_review_state(
+        ReviewState(
+            reviews=[
+                CandidateReview(
+                    report_date=date(2026, 5, 20),
+                    symbol="000001",
+                    name="平安银行",
+                    start_price=10.0,
+                    score=88.0,
+                    label="强烈关注",
+                    next_day_up_probability=0.61,
+                    three_day_up_probability=0.66,
+                    expected_return=4.2,
+                    next_day_return=5.0,
+                    three_day_return=3.0,
+                    five_day_return=2.0,
+                    touched_target=True,
+                    review_status=ReviewStatus.COMPLETE,
+                ),
+                CandidateReview(
+                    report_date=date(2026, 5, 20),
+                    symbol="000002",
+                    name="复盘样本",
+                    start_price=10.0,
+                    score=82.0,
+                    label="强烈关注",
+                    next_day_up_probability=0.59,
+                    three_day_up_probability=0.62,
+                    expected_return=3.8,
+                    next_day_return=-1.0,
+                    three_day_return=-2.0,
+                    five_day_return=-3.0,
+                    touched_stop_loss=True,
+                    review_status=ReviewStatus.COMPLETE,
+                ),
+            ]
+        )
+    )
+    provider_factory = FailsOnReviewRefreshProviderFactory()
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=provider_factory))
 
     response = client.get("/")
 
     assert response.status_code == 200
     assert "复盘统计" in response.text
     assert "次日上涨率" in response.text
+    assert "3日上涨率" in response.text
+    assert "5日上涨率" in response.text
+    assert "50.0%" in response.text
+    assert "5000.0%" not in response.text
+    assert "1/1" in response.text
     assert "/reviews" in response.text
 
 

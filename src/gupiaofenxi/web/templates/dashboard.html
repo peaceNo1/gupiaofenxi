@@ -48,9 +48,10 @@
 
       <section class="metrics review-summary">
         <div><strong>{{ review_summary.total_count }}</strong><span>复盘统计</span></div>
-        <div><strong>{% if review_summary.next_day_up_rate is not none %}{{ "%.1f"|format(review_summary.next_day_up_rate * 100) }}%{% else %}--{% endif %}</strong><span>次日上涨率</span></div>
-        <div><strong>{% if review_summary.three_day_up_rate is not none %}{{ "%.1f"|format(review_summary.three_day_up_rate * 100) }}%{% else %}--{% endif %}</strong><span>3日上涨率</span></div>
-        <div><strong>{{ review_summary.target_touch_count }}</strong><span>触达目标</span></div>
+        <div><strong>{% if review_summary.next_day_up_rate is not none %}{{ "%.1f"|format(review_summary.next_day_up_rate) }}%{% else %}--{% endif %}</strong><span>次日上涨率</span></div>
+        <div><strong>{% if review_summary.three_day_up_rate is not none %}{{ "%.1f"|format(review_summary.three_day_up_rate) }}%{% else %}--{% endif %}</strong><span>3日上涨率</span></div>
+        <div><strong>{% if review_summary.five_day_up_rate is not none %}{{ "%.1f"|format(review_summary.five_day_up_rate) }}%{% else %}--{% endif %}</strong><span>5日上涨率</span></div>
+        <div><strong>{{ review_summary.target_touch_count }}/{{ review_summary.stop_loss_touch_count }}</strong><span>目标/止损</span></div>
         <div><strong><a href="/reviews">详情</a></strong><span>复盘明细</span></div>
       </section>
 
