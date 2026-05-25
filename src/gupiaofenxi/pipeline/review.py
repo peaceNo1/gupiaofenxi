@@ -124,6 +124,7 @@ def filter_reviews(
 def _update_review_outcome(review: CandidateReview, prices: list[ReviewPrice]) -> CandidateReview:
     future = [price for price in prices if price.trade_date > review.report_date]
     first_five = future[:5]
+    invalid_start_price = review.start_price <= 0
     if not future:
         return review.model_copy(
             update={
@@ -145,7 +146,11 @@ def _update_review_outcome(review: CandidateReview, prices: list[ReviewPrice]) -
             "touched_buy_zone": _touched_buy_zone(first_five, review),
             "touched_target": _touched_target(first_five, review),
             "touched_stop_loss": _touched_stop_loss(first_five, review),
-            "review_status": ReviewStatus.COMPLETE if len(future) >= 5 else ReviewStatus.PARTIAL,
+            "review_status": ReviewStatus.MISSING_DATA
+            if invalid_start_price
+            else ReviewStatus.COMPLETE
+            if len(future) >= 5
+            else ReviewStatus.PARTIAL,
         }
     )
 

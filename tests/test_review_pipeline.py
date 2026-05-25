@@ -299,10 +299,13 @@ def test_update_review_outcomes_handles_waiting_partial_invalid_start_and_ignore
     assert partial.touched_stop_loss is False
 
     invalid_start = reviews["000003"]
-    assert invalid_start.review_status == ReviewStatus.COMPLETE
+    assert invalid_start.review_status == ReviewStatus.MISSING_DATA
     assert invalid_start.next_day_return is None
     assert invalid_start.three_day_return is None
     assert invalid_start.five_day_return is None
+    assert invalid_start.touched_buy_zone is True
+    assert invalid_start.touched_target is True
+    assert invalid_start.touched_stop_loss is False
 
 
 def test_build_review_summary_excludes_waiting_denominators_and_filter_reviews_target_hits():
