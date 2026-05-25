@@ -18,6 +18,7 @@ from gupiaofenxi.domain.models import DashboardReport, Position
 from gupiaofenxi.pipeline.historical_prediction import load_samples_from_reports
 from gupiaofenxi.pipeline.report import build_dashboard_report
 from gupiaofenxi.pipeline.review import (
+    build_review_summary,
     merge_review_snapshots,
     record_price_history,
     update_review_outcomes,
@@ -191,11 +192,14 @@ def create_app(
         report, settings = generate_report_with_filters(
             min_price, max_price, symbol_query, name_query
         )
+        review_state = store.load_review_state()
+        review_summary = build_review_summary(review_state.reviews)
         return templates.TemplateResponse(
             request,
             "dashboard.html",
             {
                 "report": report,
+                "review_summary": review_summary,
                 "settings": settings,
                 "refresh_status": refresh_status,
                 "refresh_error": refresh_error,
