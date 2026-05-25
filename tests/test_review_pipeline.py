@@ -120,6 +120,36 @@ def _quote(symbol: str, trade_date: date, close: float, high: float, low: float)
     )
 
 
+def _review(
+    symbol: str,
+    report_date: date = date(2026, 5, 20),
+    start_price: float = 10.0,
+    score: float = 80.0,
+    label: str = "alpha",
+    next_day_return: float | None = None,
+    touched_target: bool | None = None,
+    touched_stop_loss: bool | None = None,
+    review_status: ReviewStatus = ReviewStatus.WAITING,
+    trade_plan: TradePlan | None = None,
+) -> CandidateReview:
+    return CandidateReview(
+        report_date=report_date,
+        symbol=symbol,
+        name="review candidate",
+        start_price=start_price,
+        score=score,
+        label=label,
+        next_day_up_probability=0.61,
+        three_day_up_probability=0.66,
+        expected_return=4.2,
+        trade_plan=trade_plan,
+        next_day_return=next_day_return,
+        touched_target=touched_target,
+        touched_stop_loss=touched_stop_loss,
+        review_status=review_status,
+    )
+
+
 def test_merge_review_snapshots_records_report_candidates_idempotently():
     previous = CandidateReview(
         report_date=date(2026, 5, 20),
@@ -210,6 +240,71 @@ def test_update_review_outcomes_calculates_returns_and_trade_plan_touches():
     assert review.review_status == ReviewStatus.COMPLETE
 
 
+def test_update_review_outcomes_handles_waiting_partial_invalid_start_and_ignores_irrelevant_prices():
+    plan = TradePlan(
+        buy_low=9.8,
+        buy_high=10.0,
+        stop_loss=9.4,
+        target_price=11.0,
+        trigger="watch pullback",
+    )
+    state = ReviewState(
+        reviews=[
+            _review(
+                "000001",
+                next_day_return=99.0,
+                touched_target=True,
+                touched_stop_loss=True,
+                review_status=ReviewStatus.COMPLETE,
+                trade_plan=plan,
+            ),
+            _review("000002", trade_plan=plan),
+            _review("000003", start_price=0.0, trade_plan=plan),
+        ],
+        prices=[
+            ReviewPrice(trade_date=date(2026, 5, 19), symbol="000001", close=20.0, high=20.0, low=1.0),
+            ReviewPrice(trade_date=date(2026, 5, 20), symbol="000001", close=21.0, high=21.0, low=1.0),
+            ReviewPrice(trade_date=date(2026, 5, 21), symbol="999999", close=22.0, high=22.0, low=1.0),
+            ReviewPrice(trade_date=date(2026, 5, 19), symbol="000002", close=30.0, high=30.0, low=1.0),
+            ReviewPrice(trade_date=date(2026, 5, 20), symbol="000002", close=31.0, high=31.0, low=1.0),
+            ReviewPrice(trade_date=date(2026, 5, 21), symbol="000002", close=10.4, high=10.5, low=9.9),
+            ReviewPrice(trade_date=date(2026, 5, 22), symbol="000002", close=10.6, high=10.7, low=10.1),
+            ReviewPrice(trade_date=date(2026, 5, 21), symbol="000003", close=1.0, high=11.1, low=9.9),
+            ReviewPrice(trade_date=date(2026, 5, 22), symbol="000003", close=2.0, high=10.8, low=9.8),
+            ReviewPrice(trade_date=date(2026, 5, 23), symbol="000003", close=3.0, high=10.7, low=9.7),
+            ReviewPrice(trade_date=date(2026, 5, 24), symbol="000003", close=4.0, high=10.6, low=9.6),
+            ReviewPrice(trade_date=date(2026, 5, 25), symbol="000003", close=5.0, high=10.5, low=9.5),
+        ],
+    )
+
+    updated = update_review_outcomes(state)
+    reviews = {item.symbol: item for item in updated.reviews}
+
+    waiting = reviews["000001"]
+    assert waiting.review_status == ReviewStatus.WAITING
+    assert waiting.next_day_return is None
+    assert waiting.three_day_return is None
+    assert waiting.five_day_return is None
+    assert waiting.touched_buy_zone is None
+    assert waiting.touched_target is None
+    assert waiting.touched_stop_loss is None
+
+    partial = reviews["000002"]
+    assert partial.review_status == ReviewStatus.PARTIAL
+    assert partial.next_day_return == 4.0
+    assert partial.three_day_return is None
+    assert partial.five_day_return is None
+    assert partial.touched_buy_zone is True
+    assert partial.touched_target is False
+    assert partial.touched_stop_loss is False
+
+    invalid_start = reviews["000003"]
+    assert invalid_start.review_status == ReviewStatus.COMPLETE
+    assert invalid_start.next_day_return is None
+    assert invalid_start.three_day_return is None
+    assert invalid_start.five_day_return is None
+
+
 def test_build_review_summary_excludes_waiting_denominators_and_filter_reviews_target_hits():
     reviews = [
         CandidateReview(
@@ -271,3 +366,62 @@ def test_build_review_summary_excludes_waiting_denominators_and_filter_reviews_t
     assert summary.target_touch_count == 1
     assert summary.stop_loss_touch_count == 1
     assert [item.symbol for item in target_hits] == ["000001"]
+
+
+def test_filter_reviews_supports_results_labels_report_dates_and_descending_sort():
+    reviews = [
+        _review(
+            "000001",
+            report_date=date(2026, 5, 20),
+            score=90.0,
+            label="alpha",
+            next_day_return=1.5,
+            touched_target=True,
+            review_status=ReviewStatus.PARTIAL,
+        ),
+        _review(
+            "000002",
+            report_date=date(2026, 5, 21),
+            score=70.0,
+            label="beta",
+            next_day_return=-0.5,
+            touched_stop_loss=True,
+            review_status=ReviewStatus.PARTIAL,
+        ),
+        _review(
+            "000003",
+            report_date=date(2026, 5, 21),
+            score=95.0,
+            label="alpha",
+            review_status=ReviewStatus.WAITING,
+        ),
+        _review(
+            "000004",
+            report_date=date(2026, 5, 22),
+            score=60.0,
+            label="alpha",
+            next_day_return=0.0,
+            review_status=ReviewStatus.COMPLETE,
+        ),
+    ]
+
+    assert [item.symbol for item in filter_reviews(reviews, result="all")] == [
+        "000004",
+        "000003",
+        "000002",
+        "000001",
+    ]
+    assert [item.symbol for item in filter_reviews(reviews, result="up")] == ["000001"]
+    assert [item.symbol for item in filter_reviews(reviews, result="down")] == ["000004", "000002"]
+    assert [item.symbol for item in filter_reviews(reviews, result="target")] == ["000001"]
+    assert [item.symbol for item in filter_reviews(reviews, result="stop")] == ["000002"]
+    assert [item.symbol for item in filter_reviews(reviews, result="waiting")] == ["000003"]
+    assert [item.symbol for item in filter_reviews(reviews, label="alpha")] == [
+        "000004",
+        "000003",
+        "000001",
+    ]
+    assert [item.symbol for item in filter_reviews(reviews, report_date=date(2026, 5, 21))] == [
+        "000003",
+        "000002",
+    ]
