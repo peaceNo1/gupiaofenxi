@@ -99,7 +99,10 @@ def create_app(
             provider=provider_factory(),
         )
         store.save_report(report)
-        refresh_review_state(report)
+        try:
+            refresh_review_state(report)
+        except Exception:
+            pass
         return report, settings
 
     async def refresh_market_data() -> tuple[str, int]:

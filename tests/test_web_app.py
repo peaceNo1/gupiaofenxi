@@ -26,6 +26,29 @@ def sample_provider_factory():
     return SampleDataProvider(Path("data/sample"))
 
 
+class FailsOnReviewRefreshProviderFactory:
+    def __init__(self):
+        self.load_count = 0
+
+    def __call__(self):
+        factory = self
+
+        class Provider:
+            def __init__(self):
+                self.sample_provider = SampleDataProvider(Path("data/sample"))
+
+            def load_daily_quotes(self):
+                factory.load_count += 1
+                if factory.load_count == 2:
+                    raise RuntimeError("review refresh failed")
+                return self.sample_provider.load_daily_quotes()
+
+            def __getattr__(self, name):
+                return getattr(self.sample_provider, name)
+
+        return Provider()
+
+
 def test_dashboard_page_renders_ranking_first_view(tmp_path):
     client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
@@ -49,6 +72,17 @@ def test_dashboard_generation_updates_candidate_reviews(tmp_path):
     assert "reviews" in payload
     assert "prices" in payload
     assert "000001" in payload
+
+
+def test_dashboard_still_returns_report_when_review_refresh_fails(tmp_path):
+    provider_factory = FailsOnReviewRefreshProviderFactory()
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=provider_factory))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert list(tmp_path.glob("report-*.json"))
+    assert not (tmp_path / "reviews.json").exists()
 
 
 def test_api_report_respects_price_query_range_and_saves_report(tmp_path):
