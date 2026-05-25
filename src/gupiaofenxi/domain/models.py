@@ -95,6 +95,58 @@ class TradePlan(BaseModel):
     trigger: str
 
 
+class ReviewStatus(str, Enum):
+    WAITING = "等待数据"
+    PARTIAL = "部分完成"
+    COMPLETE = "已完成"
+    MISSING_DATA = "缺少行情"
+
+
+class ReviewPrice(BaseModel):
+    trade_date: date
+    symbol: str
+    close: float
+    high: float
+    low: float
+
+
+class CandidateReview(BaseModel):
+    report_date: date
+    symbol: str
+    name: str
+    start_price: float
+    score: float
+    label: str
+    next_day_up_probability: float
+    three_day_up_probability: float
+    expected_return: float
+    trade_plan: TradePlan | None = None
+    next_day_return: float | None = None
+    three_day_return: float | None = None
+    five_day_return: float | None = None
+    touched_buy_zone: bool | None = None
+    touched_target: bool | None = None
+    touched_stop_loss: bool | None = None
+    review_status: ReviewStatus = ReviewStatus.WAITING
+
+
+class ReviewSummary(BaseModel):
+    total_count: int = 0
+    next_day_count: int = 0
+    next_day_up_rate: float | None = None
+    three_day_count: int = 0
+    three_day_up_rate: float | None = None
+    five_day_count: int = 0
+    five_day_up_rate: float | None = None
+    target_touch_count: int = 0
+    stop_loss_touch_count: int = 0
+
+
+class ReviewState(BaseModel):
+    reviews: list[CandidateReview] = Field(default_factory=list)
+    prices: list[ReviewPrice] = Field(default_factory=list)
+
+
 class CandidateScore(BaseModel):
     symbol: str
     name: str
