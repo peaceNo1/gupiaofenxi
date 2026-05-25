@@ -17,6 +17,11 @@ from gupiaofenxi.data.sample_provider import SampleDataProvider
 from gupiaofenxi.domain.models import DashboardReport, Position
 from gupiaofenxi.pipeline.historical_prediction import load_samples_from_reports
 from gupiaofenxi.pipeline.report import build_dashboard_report
+from gupiaofenxi.pipeline.review import (
+    merge_review_snapshots,
+    record_price_history,
+    update_review_outcomes,
+)
 from gupiaofenxi.storage.json_store import JsonStore
 
 
@@ -63,6 +68,14 @@ def create_app(
     def generate_report(min_price: float, max_price: float) -> tuple[DashboardReport, AppSettings]:
         return generate_report_with_filters(min_price, max_price, "", "")
 
+    def refresh_review_state(report: DashboardReport) -> None:
+        state = store.load_review_state()
+        quotes, _ = provider_factory().load_daily_quotes()
+        state = merge_review_snapshots(state, report)
+        state = record_price_history(state, quotes)
+        state = update_review_outcomes(state)
+        store.save_review_state(state)
+
     def generate_report_with_filters(
         min_price: float,
         max_price: float,
@@ -86,6 +99,7 @@ def create_app(
             provider=provider_factory(),
         )
         store.save_report(report)
+        refresh_review_state(report)
         return report, settings
 
     async def refresh_market_data() -> tuple[str, int]:

@@ -37,6 +37,20 @@ def test_dashboard_page_renders_ranking_first_view(tmp_path):
     assert "10.50" in response.text
 
 
+def test_dashboard_generation_updates_candidate_reviews(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    review_path = tmp_path / "reviews.json"
+    assert review_path.exists()
+    payload = review_path.read_text(encoding="utf-8")
+    assert "reviews" in payload
+    assert "prices" in payload
+    assert "000001" in payload
+
+
 def test_api_report_respects_price_query_range_and_saves_report(tmp_path):
     client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
 
