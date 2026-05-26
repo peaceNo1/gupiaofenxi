@@ -89,6 +89,28 @@ def test_reviews_page_renders_detail_table_and_filters(tmp_path):
     assert "等待数据" in response.text
 
 
+def test_reviews_page_rejects_invalid_report_date(tmp_path):
+    client = TestClient(
+        create_app(store_root=tmp_path, provider_factory=sample_provider_factory),
+        raise_server_exceptions=False,
+    )
+
+    response = client.get("/reviews?report_date=bad-date")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "日期格式无效"
+
+
+def test_reviews_page_normalizes_unknown_result_filter(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    client.get("/")
+    response = client.get("/reviews?result=garbage")
+
+    assert response.status_code == 200
+    assert '<option value="all" selected>' in response.text
+
+
 def test_dashboard_renders_review_summary(tmp_path):
     JsonStore(tmp_path).save_review_state(
         ReviewState(

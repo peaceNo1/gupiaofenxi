@@ -243,7 +243,13 @@ def create_app(
         result: str = "all",
     ):
         state = store.load_review_state()
-        parsed_date = date.fromisoformat(report_date) if report_date else None
+        allowed_results = {"all", "up", "down", "target", "stop", "waiting"}
+        if result not in allowed_results:
+            result = "all"
+        try:
+            parsed_date = date.fromisoformat(report_date) if report_date else None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="日期格式无效") from exc
         rows = filter_reviews(state.reviews, report_date=parsed_date, label=label, result=result)
         summary = build_review_summary(state.reviews)
         labels = sorted({item.label for item in state.reviews})
