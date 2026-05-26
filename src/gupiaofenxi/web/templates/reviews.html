@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>复盘明细</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div>
+          <h1>复盘明细</h1>
+          <p>候选股复盘结果与命中状态</p>
+        </div>
+        <div class="status-strip">
+          <a href="/">返回仪表盘</a>
+        </div>
+      </header>
+
+      <section class="metrics review-summary">
+        <div><strong>{{ summary.total_count }}</strong><span>复盘总数</span></div>
+        <div><strong>{% if summary.next_day_up_rate is not none %}{{ "%.2f"|format(summary.next_day_up_rate) }}%{% else %}--{% endif %}</strong><span>次日上涨率</span></div>
+        <div><strong>{% if summary.three_day_up_rate is not none %}{{ "%.2f"|format(summary.three_day_up_rate) }}%{% else %}--{% endif %}</strong><span>3日上涨率</span></div>
+        <div><strong>{% if summary.five_day_up_rate is not none %}{{ "%.2f"|format(summary.five_day_up_rate) }}%{% else %}--{% endif %}</strong><span>5日上涨率</span></div>
+        <div><strong>{{ summary.target_touch_count }}</strong><span>触达目标</span></div>
+        <div><strong>{{ summary.stop_loss_touch_count }}</strong><span>触达止损</span></div>
+      </section>
+
+      <form class="filters" method="get" action="/reviews">
+        <label>
+          日期
+          <select name="report_date">
+            <option value="">全部</option>
+            {% for item in dates %}
+              <option value="{{ item }}" {% if item == selected_date %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          标签
+          <select name="label">
+            <option value="">全部</option>
+            {% for item in labels %}
+              <option value="{{ item }}" {% if item == selected_label %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          结果
+          <select name="result">
+            <option value="all" {% if selected_result == "all" %}selected{% endif %}>全部</option>
+            <option value="up" {% if selected_result == "up" %}selected{% endif %}>上涨</option>
+            <option value="down" {% if selected_result == "down" %}selected{% endif %}>下跌</option>
+            <option value="target" {% if selected_result == "target" %}selected{% endif %}>触达目标</option>
+            <option value="stop" {% if selected_result == "stop" %}selected{% endif %}>触达止损</option>
+            <option value="waiting" {% if selected_result == "waiting" %}selected{% endif %}>等待数据</option>
+          </select>
+        </label>
+        <button type="submit">筛选</button>
+      </form>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>代码</th>
+              <th>名称</th>
+              <th>起始价</th>
+              <th>综合分</th>
+              <th>标签</th>
+              <th>次日涨跌</th>
+              <th>3日涨跌</th>
+              <th>5日涨跌</th>
+              <th>低吸区间</th>
+              <th>目标</th>
+              <th>止损</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in reviews %}
+              <tr>
+                <td>{{ item.report_date }}</td>
+                <td>{{ item.symbol }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ "%.2f"|format(item.start_price) }}</td>
+                <td>{{ "%.2f"|format(item.score) }}</td>
+                <td>{{ item.label }}</td>
+                <td>{% if item.next_day_return is not none %}{{ "%.2f"|format(item.next_day_return) }}%{% else %}等待数据{% endif %}</td>
+                <td>{% if item.three_day_return is not none %}{{ "%.2f"|format(item.three_day_return) }}%{% else %}等待数据{% endif %}</td>
+                <td>{% if item.five_day_return is not none %}{{ "%.2f"|format(item.five_day_return) }}%{% else %}等待数据{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ "%.2f"|format(item.trade_plan.buy_low) }}-{{ "%.2f"|format(item.trade_plan.buy_high) }}{% else %}-{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ "%.2f"|format(item.trade_plan.target_price) }}{% else %}-{% endif %}</td>
+                <td>{% if item.trade_plan %}{{ "%.2f"|format(item.trade_plan.stop_loss) }}{% else %}-{% endif %}</td>
+                <td>{{ item.review_status.value }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

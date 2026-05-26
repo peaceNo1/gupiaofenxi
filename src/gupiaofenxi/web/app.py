@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -19,6 +20,7 @@ from gupiaofenxi.pipeline.historical_prediction import load_samples_from_reports
 from gupiaofenxi.pipeline.report import build_dashboard_report
 from gupiaofenxi.pipeline.review import (
     build_review_summary,
+    filter_reviews,
     merge_review_snapshots,
     record_price_history,
     update_review_outcomes,
@@ -232,6 +234,33 @@ def create_app(
         max_price: float = DEFAULT_SETTINGS.max_price,
     ):
         return refresh_response(min_price, max_price)
+
+    @app.get("/reviews", response_class=HTMLResponse)
+    def reviews_page(
+        request: Request,
+        report_date: str = "",
+        label: str = "",
+        result: str = "all",
+    ):
+        state = store.load_review_state()
+        parsed_date = date.fromisoformat(report_date) if report_date else None
+        rows = filter_reviews(state.reviews, report_date=parsed_date, label=label, result=result)
+        summary = build_review_summary(state.reviews)
+        labels = sorted({item.label for item in state.reviews})
+        dates = sorted({item.report_date.isoformat() for item in state.reviews}, reverse=True)
+        return templates.TemplateResponse(
+            request,
+            "reviews.html",
+            {
+                "reviews": rows,
+                "summary": summary,
+                "labels": labels,
+                "dates": dates,
+                "selected_date": report_date,
+                "selected_label": label,
+                "selected_result": result,
+            },
+        )
 
     @app.get("/api/report")
     def api_report(

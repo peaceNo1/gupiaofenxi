@@ -75,6 +75,20 @@ def test_dashboard_generation_updates_candidate_reviews(tmp_path):
     assert "000001" in payload
 
 
+def test_reviews_page_renders_detail_table_and_filters(tmp_path):
+    client = TestClient(create_app(store_root=tmp_path, provider_factory=sample_provider_factory))
+
+    client.get("/")
+    response = client.get("/reviews?result=waiting")
+
+    assert response.status_code == 200
+    assert "复盘明细" in response.text
+    assert 'name="result"' in response.text
+    assert "000001" in response.text
+    assert "次日涨跌" in response.text
+    assert "等待数据" in response.text
+
+
 def test_dashboard_renders_review_summary(tmp_path):
     JsonStore(tmp_path).save_review_state(
         ReviewState(
